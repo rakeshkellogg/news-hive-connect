@@ -32,7 +32,11 @@ const CreateGroup = () => {
     setLoading(true);
 
     try {
-      console.log('Creating group with user ID:', user.id);
+      console.log('user.id:', user.id);
+      
+      // Get current auth user to ensure we have the correct ID
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      console.log('auth.uid():', authUser?.id);
       
       // Create the group
       const { data: group, error: groupError } = await supabase
@@ -40,7 +44,7 @@ const CreateGroup = () => {
         .insert({
           name,
           description,
-          created_by: user.id,
+          created_by: authUser?.id,
         })
         .select()
         .single();
