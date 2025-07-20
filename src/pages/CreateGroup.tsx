@@ -20,11 +20,20 @@ const CreateGroup = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to create a group.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
 
     try {
+      console.log('Creating group with user ID:', user.id);
+      
       // Create the group
       const { data: group, error: groupError } = await supabase
         .from('groups')
