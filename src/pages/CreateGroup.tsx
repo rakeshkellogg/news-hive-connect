@@ -38,13 +38,22 @@ const CreateGroup = () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       console.log('auth.uid():', authUser?.id);
       
+      // Check current session
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Session exists:', !!session);
+      console.log('Session user:', session?.user?.id);
+      
+      if (!authUser?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       // Create the group
       const { data: group, error: groupError } = await supabase
         .from('groups')
         .insert({
           name,
           description,
-          created_by: authUser?.id,
+          created_by: authUser.id,
         })
         .select()
         .single();
