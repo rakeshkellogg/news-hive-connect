@@ -82,6 +82,8 @@ const Feed = () => {
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [showMembersDialog, setShowMembersDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [newPostContent, setNewPostContent] = useState('');
+  const [showCreatePost, setShowCreatePost] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -191,54 +193,138 @@ const Feed = () => {
     });
   };
 
-  // Mock posts data - replace with actual data fetching
+  // Fetch posts for selected group
+  const fetchPosts = async (groupId: string) => {
+    try {
+      const { data: posts, error } = await supabase
+        .from('posts')
+        .select(`
+          id,
+          content,
+          created_at,
+          user_id,
+          profiles!posts_user_id_fkey (
+            email
+          )
+        `)
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Fetch comments and likes for each post
+      const postsWithDetails = await Promise.all(
+        (posts || []).map(async (post) => {
+          // Fetch comments
+          const { data: comments } = await supabase
+            .from('comments')
+            .select(`
+              id,
+              content,
+              created_at,
+              user_id,
+              profiles!comments_user_id_fkey (
+                email
+              )
+            `)
+            .eq('post_id', post.id)
+            .order('created_at', { ascending: true });
+
+          // Fetch likes count
+          const { count: likesCount } = await supabase
+            .from('likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('post_id', post.id);
+
+          // Check if current user liked this post
+          const { data: userLike } = await supabase
+            .from('likes')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('user_id', user?.id)
+            .maybeSingle();
+
+          return {
+            id: post.id,
+            content: post.content,
+            author: post.profiles?.email || 'Unknown User',
+            created_at: post.created_at,
+            type: 'user' as const,
+            likes: likesCount || 0,
+            liked: !!userLike,
+            comments: (comments || []).map(comment => ({
+              id: comment.id,
+              content: comment.content,
+              author: comment.profiles?.email || 'Unknown User',
+              created_at: comment.created_at,
+            }))
+          };
+        })
+      );
+
+      setPosts(postsWithDetails);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load posts",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     if (selectedGroup) {
-      const mockPosts: Post[] = [
-        {
-          id: '1',
-          content: 'Welcome to the group! This is a user post where we can discuss the latest news and share insights.',
-          author: 'John Doe',
-          created_at: new Date().toISOString(),
-          type: 'user',
-          likes: 5,
-          liked: false,
-          comments: [
-            {
-              id: 'c1',
-              content: 'Thanks for the welcome! Looking forward to great discussions.',
-              author: 'Jane Smith',
-              created_at: new Date(Date.now() - 1800000).toISOString()
-            }
-          ]
-        },
-        {
-          id: '2',
-          content: 'Breaking: AI developments continue to accelerate in 2024. Here are the latest insights from technology research institutes around the world.',
-          author: 'AI News Bot',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          type: 'automated',
-          likes: 12,
-          liked: true,
-          comments: []
-        }
-      ];
-      setPosts(mockPosts);
+      fetchPosts(selectedGroup.id);
     }
-  }, [selectedGroup]);
+  }, [selectedGroup, user?.id]);
 
-  const toggleLike = (postId: string) => {
-    setPosts(prevPosts => 
-      prevPosts.map(post => 
-        post.id === postId 
-          ? {
-              ...post,
-              liked: !post.liked,
-              likes: post.liked ? post.likes - 1 : post.likes + 1
-            }
-          : post
-      )
-    );
+  const toggleLike = async (postId: string) => {
+    try {
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+
+      if (post.liked) {
+        // Remove like
+        const { error } = await supabase
+          .from('likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', user?.id);
+
+        if (error) throw error;
+      } else {
+        // Add like
+        const { error } = await supabase
+          .from('likes')
+          .insert({
+            post_id: postId,
+            user_id: user?.id
+          });
+
+        if (error) throw error;
+      }
+
+      // Update UI optimistically
+      setPosts(prevPosts => 
+        prevPosts.map(p => 
+          p.id === postId 
+            ? {
+                ...p,
+                liked: !p.liked,
+                likes: p.liked ? p.likes - 1 : p.likes + 1
+              }
+            : p
+        )
+      );
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update like",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleComments = (postId: string) => {
@@ -329,34 +415,115 @@ const Feed = () => {
     }));
   };
 
-  const addComment = (postId: string) => {
+  const createPost = async () => {
+    if (!newPostContent.trim() || !selectedGroup) return;
+
+    try {
+      const { data: newPost, error } = await supabase
+        .from('posts')
+        .insert({
+          group_id: selectedGroup.id,
+          user_id: user?.id,
+          content: newPostContent.trim()
+        })
+        .select(`
+          id,
+          content,
+          created_at,
+          user_id,
+          profiles!posts_user_id_fkey (
+            email
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      const postToAdd: Post = {
+        id: newPost.id,
+        content: newPost.content,
+        author: newPost.profiles?.email || 'You',
+        created_at: newPost.created_at,
+        type: 'user',
+        likes: 0,
+        liked: false,
+        comments: []
+      };
+
+      setPosts(prevPosts => [postToAdd, ...prevPosts]);
+      setNewPostContent('');
+      setShowCreatePost(false);
+
+      toast({
+        title: "Post created!",
+        description: "Your post has been published to the group.",
+      });
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create post",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const addComment = async (postId: string) => {
     const commentText = commentInputs[postId]?.trim();
     if (!commentText) return;
 
-    const newComment: Comment = {
-      id: `c${Date.now()}`,
-      content: commentText,
-      author: user?.email?.split('@')[0] || 'You',
-      created_at: new Date().toISOString()
-    };
+    try {
+      const { data: newComment, error } = await supabase
+        .from('comments')
+        .insert({
+          post_id: postId,
+          user_id: user?.id,
+          content: commentText
+        })
+        .select(`
+          id,
+          content,
+          created_at,
+          profiles!comments_user_id_fkey (
+            email
+          )
+        `)
+        .single();
 
-    setPosts(prevPosts =>
-      prevPosts.map(post =>
-        post.id === postId
-          ? { ...post, comments: [...post.comments, newComment] }
-          : post
-      )
-    );
+      if (error) throw error;
 
-    setCommentInputs(prev => ({
-      ...prev,
-      [postId]: ''
-    }));
+      const commentToAdd: Comment = {
+        id: newComment.id,
+        content: newComment.content,
+        author: newComment.profiles?.email || 'You',
+        created_at: newComment.created_at
+      };
 
-    toast({
-      title: "Comment added!",
-      description: "Your comment has been posted successfully.",
-    });
+      setPosts(prevPosts =>
+        prevPosts.map(post =>
+          post.id === postId
+            ? { ...post, comments: [...post.comments, commentToAdd] }
+            : post
+        )
+      );
+
+      setCommentInputs(prev => ({
+        ...prev,
+        [postId]: ''
+      }));
+
+      toast({
+        title: "Comment added!",
+        description: "Your comment has been posted successfully.",
+      });
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add comment",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading || loadingGroups) {
@@ -581,7 +748,44 @@ const Feed = () => {
 
             {/* Posts Section */}
             <div className="space-y-4">
-              <h3 className="text-xl font-semibold">Latest Updates</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold">Latest Updates</h3>
+                <Dialog open={showCreatePost} onOpenChange={setShowCreatePost}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Post
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create New Post</DialogTitle>
+                      <DialogDescription>
+                        Share something with {selectedGroup?.name}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Textarea
+                        placeholder="What's on your mind?"
+                        value={newPostContent}
+                        onChange={(e) => setNewPostContent(e.target.value)}
+                        className="min-h-[120px]"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setShowCreatePost(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={createPost}
+                          disabled={!newPostContent.trim()}
+                        >
+                          Post
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
               
               {posts.length === 0 ? (
                 <div className="text-center py-8">
