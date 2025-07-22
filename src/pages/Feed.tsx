@@ -31,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, AtSign, Settings, Trash2, UserMinus, Crown } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, AtSign, Settings, Trash2, UserMinus, Crown, Share2, Copy } from "lucide-react";
 
 interface Group {
   id: string;
@@ -81,6 +81,7 @@ const Feed = () => {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [showMembersDialog, setShowMembersDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -413,72 +414,113 @@ const Feed = () => {
                     <p className="text-muted-foreground">{selectedGroup.description}</p>
                   </div>
                   
-                  {/* Admin Controls */}
-                  {isGroupAdmin(selectedGroup) && (
-                    <div className="flex gap-2">
-                      <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <Users className="h-4 w-4 mr-2" />
-                            Manage Members ({groupMembers.length})
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Group Members</DialogTitle>
-                            <DialogDescription>
-                              Manage members of {selectedGroup.name}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-3 max-h-60 overflow-y-auto">
-                            {groupMembers.map((member) => (
-                              <div key={member.id} className="flex items-center justify-between p-2 border rounded">
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">{member.email}</span>
-                                    {member.role === 'admin' && (
-                                      <Crown className="h-3 w-3 text-yellow-500" />
-                                    )}
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    Joined {new Date(member.joined_at).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                {member.user_id !== user?.id && (
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="outline" size="sm">
-                                        <UserMinus className="h-3 w-3" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Remove Member</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Are you sure you want to remove {member.email} from the group?
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => removeMember(member.id)}>
-                                          Remove
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                )}
-                              </div>
-                            ))}
+                  {/* Group Controls */}
+                  <div className="flex gap-2">
+                    {/* Invite Button - Available to all members */}
+                    <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Invite
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Invite to {selectedGroup.name}</DialogTitle>
+                          <DialogDescription>
+                            Share this link to invite others to join the group
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={`${window.location.origin}/auth?invite=${selectedGroup.invite_code}`}
+                              readOnly
+                              className="flex-1 px-3 py-2 border rounded text-sm bg-muted"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => copyInviteLink(selectedGroup.invite_code)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
                           </div>
-                        </DialogContent>
-                      </Dialog>
-                      
-                      <Button variant="outline" size="sm">
-                        <Settings className="h-4 w-4 mr-2" />
-                        Settings
-                      </Button>
-                    </div>
-                  )}
+                          <p className="text-sm text-muted-foreground">
+                            Anyone with this link can join the group and see all posts and updates.
+                          </p>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Admin-only Controls */}
+                    {isGroupAdmin(selectedGroup) && (
+                      <>
+                        <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Users className="h-4 w-4 mr-2" />
+                              Manage Members ({groupMembers.length})
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Group Members</DialogTitle>
+                              <DialogDescription>
+                                Manage members of {selectedGroup.name}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-3 max-h-60 overflow-y-auto">
+                              {groupMembers.map((member) => (
+                                <div key={member.id} className="flex items-center justify-between p-2 border rounded">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium">{member.email}</span>
+                                      {member.role === 'admin' && (
+                                        <Crown className="h-3 w-3 text-yellow-500" />
+                                      )}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                      Joined {new Date(member.joined_at).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  {member.user_id !== user?.id && (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="outline" size="sm">
+                                          <UserMinus className="h-3 w-3" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Remove Member</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Are you sure you want to remove {member.email} from the group?
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => removeMember(member.id)}>
+                                            Remove
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        
+                        <Button variant="outline" size="sm">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Settings
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
