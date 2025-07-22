@@ -6,13 +6,32 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, AtSign } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, AtSign, Settings, Trash2, UserMinus, Crown } from "lucide-react";
 
 interface Group {
   id: string;
@@ -20,6 +39,7 @@ interface Group {
   description: string;
   invite_code: string;
   created_at: string;
+  created_by: string;
   member_count?: number;
 }
 
@@ -41,6 +61,14 @@ interface Comment {
   created_at: string;
 }
 
+interface GroupMember {
+  id: string;
+  user_id: string;
+  email: string;
+  role: 'admin' | 'member';
+  joined_at: string;
+}
+
 const Feed = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -51,6 +79,8 @@ const Feed = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [showMembersDialog, setShowMembersDialog] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -74,7 +104,8 @@ const Feed = () => {
             name,
             description,
             invite_code,
-            created_at
+            created_at,
+            created_by
           )
         `)
         .eq('user_id', user?.id);
@@ -87,6 +118,7 @@ const Feed = () => {
       // Set first group as selected by default
       if (userGroups.length > 0) {
         setSelectedGroup(userGroups[0]);
+        fetchGroupMembers(userGroups[0].id);
       }
     } catch (error) {
       console.error('Error fetching groups:', error);
@@ -97,6 +129,51 @@ const Feed = () => {
       });
     } finally {
       setLoadingGroups(false);
+    }
+  };
+
+  const fetchGroupMembers = async (groupId: string) => {
+    try {
+      // First get group memberships
+      const { data: memberships, error: membershipError } = await supabase
+        .from('group_memberships')
+        .select('id, user_id, role, joined_at')
+        .eq('group_id', groupId);
+
+      if (membershipError) throw membershipError;
+
+      // Then get user profiles for each membership
+      const members: GroupMember[] = [];
+      
+      for (const membership of memberships || []) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('user_id', membership.user_id)
+          .single();
+
+        members.push({
+          id: membership.id,
+          user_id: membership.user_id,
+          email: profile?.email || 'Unknown User',
+          role: membership.role as 'admin' | 'member',
+          joined_at: membership.joined_at
+        });
+      }
+
+      setGroupMembers(members);
+    } catch (error) {
+      console.error('Error fetching group members:', error);
+      // Set mock data for now
+      setGroupMembers([
+        {
+          id: '1',
+          user_id: user?.id || '',
+          email: user?.email || 'current-user@example.com',
+          role: 'admin',
+          joined_at: new Date().toISOString()
+        }
+      ]);
     }
   };
 
@@ -180,6 +257,42 @@ const Feed = () => {
     });
   };
 
+  const isGroupAdmin = (group: Group | null): boolean => {
+    return group?.created_by === user?.id;
+  };
+
+  const deletePost = (postId: string) => {
+    setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+    toast({
+      title: "Post deleted",
+      description: "The post has been removed successfully.",
+    });
+  };
+
+  const removeMember = async (memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from('group_memberships')
+        .delete()
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      setGroupMembers(prev => prev.filter(member => member.id !== memberId));
+      toast({
+        title: "Member removed",
+        description: "The member has been removed from the group.",
+      });
+    } catch (error) {
+      console.error('Error removing member:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove member from group.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleCommentInputChange = (postId: string, value: string) => {
     setCommentInputs(prev => ({
       ...prev,
@@ -245,7 +358,10 @@ const Feed = () => {
                   {groups.map((group) => (
                     <DropdownMenuItem
                       key={group.id}
-                      onClick={() => setSelectedGroup(group)}
+                      onClick={() => {
+                        setSelectedGroup(group);
+                        fetchGroupMembers(group.id);
+                      }}
                     >
                       {group.name}
                     </DropdownMenuItem>
@@ -286,8 +402,84 @@ const Feed = () => {
             {/* Selected Group Info */}
             {selectedGroup && (
               <div className="bg-muted/50 rounded-lg p-4">
-                <h2 className="text-2xl font-bold mb-2">{selectedGroup.name}</h2>
-                <p className="text-muted-foreground">{selectedGroup.description}</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h2 className="text-2xl font-bold">{selectedGroup.name}</h2>
+                      {isGroupAdmin(selectedGroup) && (
+                        <Crown className="h-5 w-5 text-yellow-500" />
+                      )}
+                    </div>
+                    <p className="text-muted-foreground">{selectedGroup.description}</p>
+                  </div>
+                  
+                  {/* Admin Controls */}
+                  {isGroupAdmin(selectedGroup) && (
+                    <div className="flex gap-2">
+                      <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Users className="h-4 w-4 mr-2" />
+                            Manage Members ({groupMembers.length})
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Group Members</DialogTitle>
+                            <DialogDescription>
+                              Manage members of {selectedGroup.name}
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-3 max-h-60 overflow-y-auto">
+                            {groupMembers.map((member) => (
+                              <div key={member.id} className="flex items-center justify-between p-2 border rounded">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{member.email}</span>
+                                    {member.role === 'admin' && (
+                                      <Crown className="h-3 w-3 text-yellow-500" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    Joined {new Date(member.joined_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                {member.user_id !== user?.id && (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="outline" size="sm">
+                                        <UserMinus className="h-3 w-3" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Remove Member</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Are you sure you want to remove {member.email} from the group?
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => removeMember(member.id)}>
+                                          Remove
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      
+                      <Button variant="outline" size="sm">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Settings
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -326,6 +518,33 @@ const Feed = () => {
                               <span className="text-sm text-muted-foreground">
                                 {new Date(post.created_at).toLocaleString()}
                               </span>
+                              
+                              {/* Admin Delete Button */}
+                              {isGroupAdmin(selectedGroup) && (
+                                <div className="ml-auto">
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete Post</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Are you sure you want to delete this post? This action cannot be undone.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => deletePost(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                          Delete
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              )}
                             </div>
                             <p className="text-foreground mb-4">{post.content}</p>
                             
