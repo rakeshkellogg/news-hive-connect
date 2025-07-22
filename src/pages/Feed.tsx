@@ -5,13 +5,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, AtSign } from "lucide-react";
 
 interface Group {
   id: string;
@@ -28,6 +29,16 @@ interface Post {
   author: string;
   created_at: string;
   type: 'user' | 'automated';
+  likes: number;
+  liked: boolean;
+  comments: Comment[];
+}
+
+interface Comment {
+  id: string;
+  content: string;
+  author: string;
+  created_at: string;
 }
 
 const Feed = () => {
@@ -38,6 +49,8 @@ const Feed = () => {
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!loading && !user) {
@@ -111,22 +124,98 @@ const Feed = () => {
       const mockPosts: Post[] = [
         {
           id: '1',
-          content: 'Welcome to the group! This is a user post.',
+          content: 'Welcome to the group! This is a user post where we can discuss the latest news and share insights.',
           author: 'John Doe',
           created_at: new Date().toISOString(),
-          type: 'user'
+          type: 'user',
+          likes: 5,
+          liked: false,
+          comments: [
+            {
+              id: 'c1',
+              content: 'Thanks for the welcome! Looking forward to great discussions.',
+              author: 'Jane Smith',
+              created_at: new Date(Date.now() - 1800000).toISOString()
+            }
+          ]
         },
         {
           id: '2',
-          content: 'Breaking: AI developments continue to accelerate in 2024. Here are the latest insights from technology research.',
+          content: 'Breaking: AI developments continue to accelerate in 2024. Here are the latest insights from technology research institutes around the world.',
           author: 'AI News Bot',
           created_at: new Date(Date.now() - 3600000).toISOString(),
-          type: 'automated'
+          type: 'automated',
+          likes: 12,
+          liked: true,
+          comments: []
         }
       ];
       setPosts(mockPosts);
     }
   }, [selectedGroup]);
+
+  const toggleLike = (postId: string) => {
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        post.id === postId 
+          ? {
+              ...post,
+              liked: !post.liked,
+              likes: post.liked ? post.likes - 1 : post.likes + 1
+            }
+          : post
+      )
+    );
+  };
+
+  const toggleComments = (postId: string) => {
+    setExpandedComments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleCommentInputChange = (postId: string, value: string) => {
+    setCommentInputs(prev => ({
+      ...prev,
+      [postId]: value
+    }));
+  };
+
+  const addComment = (postId: string) => {
+    const commentText = commentInputs[postId]?.trim();
+    if (!commentText) return;
+
+    const newComment: Comment = {
+      id: `c${Date.now()}`,
+      content: commentText,
+      author: user?.email?.split('@')[0] || 'You',
+      created_at: new Date().toISOString()
+    };
+
+    setPosts(prevPosts =>
+      prevPosts.map(post =>
+        post.id === postId
+          ? { ...post, comments: [...post.comments, newComment] }
+          : post
+      )
+    );
+
+    setCommentInputs(prev => ({
+      ...prev,
+      [postId]: ''
+    }));
+
+    toast({
+      title: "Comment added!",
+      description: "Your comment has been posted successfully.",
+    });
+  };
 
   if (loading || loadingGroups) {
     return (
@@ -214,7 +303,7 @@ const Feed = () => {
               ) : (
                 <div className="space-y-4">
                   {posts.map((post) => (
-                    <Card key={post.id}>
+                    <Card key={post.id} className="overflow-hidden">
                       <CardContent className="pt-6">
                         <div className="flex items-start gap-3">
                           <div className="flex-shrink-0">
@@ -238,7 +327,85 @@ const Feed = () => {
                                 {new Date(post.created_at).toLocaleString()}
                               </span>
                             </div>
-                            <p className="text-foreground">{post.content}</p>
+                            <p className="text-foreground mb-4">{post.content}</p>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-4 pb-3 border-b">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleLike(post.id)}
+                                className={`gap-2 ${post.liked ? 'text-red-500' : 'text-muted-foreground'}`}
+                              >
+                                <Heart className={`h-4 w-4 ${post.liked ? 'fill-current' : ''}`} />
+                                {post.likes}
+                              </Button>
+                              
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleComments(post.id)}
+                                className="gap-2 text-muted-foreground"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                                {post.comments.length}
+                              </Button>
+                              
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-2 text-muted-foreground"
+                              >
+                                <AtSign className="h-4 w-4" />
+                                Tag
+                              </Button>
+                            </div>
+
+                            {/* Comments Section */}
+                            {expandedComments.has(post.id) && (
+                              <div className="mt-4 space-y-3 animate-fade-in">
+                                {/* Existing Comments */}
+                                {post.comments.map((comment) => (
+                                  <div key={comment.id} className="flex gap-3 pl-2">
+                                    <div className="h-6 w-6 bg-muted rounded-full flex items-center justify-center text-xs font-semibold">
+                                      {comment.author.charAt(0)}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-sm font-medium">{comment.author}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {new Date(comment.created_at).toLocaleString()}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm text-foreground">{comment.content}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                                
+                                {/* Comment Input */}
+                                <div className="flex gap-2 mt-3">
+                                  <Textarea
+                                    placeholder="Write a comment... Use @username to tag someone"
+                                    value={commentInputs[post.id] || ''}
+                                    onChange={(e) => handleCommentInputChange(post.id, e.target.value)}
+                                    className="min-h-[60px] resize-none"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        addComment(post.id);
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={() => addComment(post.id)}
+                                    disabled={!commentInputs[post.id]?.trim()}
+                                  >
+                                    <Send className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </CardContent>
