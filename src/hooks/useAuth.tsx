@@ -42,9 +42,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         // Handle pending invite code after signup
         if (event === 'SIGNED_IN') {
           const pendingInviteCode = localStorage.getItem("pendingInviteCode");
-          if (pendingInviteCode) {
+          if (pendingInviteCode && session?.user?.id) {
             setTimeout(() => {
-              joinGroupByInviteCode(pendingInviteCode);
+              joinGroupByInviteCode(pendingInviteCode, session.user.id);
               localStorage.removeItem("pendingInviteCode");
             }, 1000);
           }
@@ -62,8 +62,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const joinGroupByInviteCode = async (inviteCode: string) => {
+  const joinGroupByInviteCode = async (inviteCode: string, userId: string) => {
     try {
+      console.log('Joining group with user ID:', userId, 'and invite code:', inviteCode);
+      
       // Find the group by invite code
       const { data: group, error: groupError } = await supabase
         .from('groups')
@@ -71,18 +73,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .eq('invite_code', inviteCode)
         .single();
 
-      if (groupError) throw groupError;
+      if (groupError) {
+        console.error('Error finding group:', groupError);
+        throw groupError;
+      }
+
+      console.log('Found group:', group);
 
       // Join the group
       const { error: membershipError } = await supabase
         .from('group_memberships')
         .insert({
           group_id: group.id,
-          user_id: user?.id,
+          user_id: userId,
           role: 'member'
         });
 
-      if (membershipError) throw membershipError;
+      if (membershipError) {
+        console.error('Error creating membership:', membershipError);
+        throw membershipError;
+      }
+      
+      console.log('Successfully joined group');
     } catch (error) {
       console.error('Error joining group:', error);
     }
