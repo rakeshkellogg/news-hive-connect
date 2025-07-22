@@ -289,6 +289,39 @@ const Feed = () => {
     }
   };
 
+  const leaveGroup = async (groupId: string) => {
+    try {
+      const { error } = await supabase
+        .from('group_memberships')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      // Remove the group from user's groups and refresh
+      setGroups(prev => prev.filter(group => group.id !== groupId));
+      
+      // If this was the selected group, clear selection
+      if (selectedGroup?.id === groupId) {
+        setSelectedGroup(null);
+        setPosts([]);
+      }
+
+      toast({
+        title: "Left group",
+        description: "You have successfully left the group.",
+      });
+    } catch (error) {
+      console.error('Error leaving group:', error);
+      toast({
+        title: "Error",
+        description: "Failed to leave the group.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleCommentInputChange = (postId: string, value: string) => {
     setCommentInputs(prev => ({
       ...prev,
@@ -448,6 +481,32 @@ const Feed = () => {
                         </div>
                       </DialogContent>
                     </Dialog>
+
+                    {/* Leave Group Button - Available to non-admin members */}
+                    {!isGroupAdmin(selectedGroup) && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <LogOut className="h-4 w-4 mr-2" />
+                            Leave Group
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Leave Group</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to leave "{selectedGroup.name}"? You will no longer receive updates from this group.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => leaveGroup(selectedGroup.id)}>
+                              Leave Group
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
 
                     {/* Admin-only Controls */}
                     {isGroupAdmin(selectedGroup) && (
