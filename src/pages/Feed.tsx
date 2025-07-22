@@ -135,46 +135,38 @@ const Feed = () => {
 
   const fetchGroupMembers = async (groupId: string) => {
     try {
-      // First get group memberships
-      const { data: memberships, error: membershipError } = await supabase
+      const { data, error } = await supabase
         .from('group_memberships')
-        .select('id, user_id, role, joined_at')
+        .select(`
+          id,
+          user_id, 
+          role,
+          joined_at,
+          profiles (
+            email,
+            username
+          )
+        `)
         .eq('group_id', groupId);
 
-      if (membershipError) throw membershipError;
+      if (error) throw error;
 
-      // Then get user profiles for each membership
-      const members: GroupMember[] = [];
-      
-      for (const membership of memberships || []) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('user_id', membership.user_id)
-          .single();
-
-        members.push({
-          id: membership.id,
-          user_id: membership.user_id,
-          email: profile?.email || 'Unknown User',
-          role: membership.role as 'admin' | 'member',
-          joined_at: membership.joined_at
-        });
-      }
+      const members: GroupMember[] = (data || []).map(membership => ({
+        id: membership.id,
+        user_id: membership.user_id,
+        email: membership.profiles?.email || 'Unknown User',
+        role: membership.role as 'admin' | 'member',
+        joined_at: membership.joined_at
+      }));
 
       setGroupMembers(members);
     } catch (error) {
       console.error('Error fetching group members:', error);
-      // Set mock data for now
-      setGroupMembers([
-        {
-          id: '1',
-          user_id: user?.id || '',
-          email: user?.email || 'current-user@example.com',
-          role: 'admin',
-          joined_at: new Date().toISOString()
-        }
-      ]);
+      toast({
+        title: "Error",
+        description: "Failed to load group members",
+        variant: "destructive",
+      });
     }
   };
 

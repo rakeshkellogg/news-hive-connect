@@ -108,10 +108,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      user_can_access_group: {
-        Args: { check_user_id: string; check_group_id: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
