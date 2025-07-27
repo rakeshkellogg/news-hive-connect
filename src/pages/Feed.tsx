@@ -33,6 +33,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface Group {
   id: string;
@@ -42,6 +46,9 @@ interface Group {
   created_at: string;
   created_by: string;
   member_count?: number;
+  automated_news_enabled?: boolean;
+  news_prompt?: string;
+  update_frequency?: number;
 }
 
 interface Post {
@@ -86,6 +93,12 @@ const Feed = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<{ postId: string; suggestions: GroupMember[]; position: { top: number; left: number } } | null>(null);
+  const [showGroupSettings, setShowGroupSettings] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    automated_news_enabled: false,
+    news_prompt: '',
+    update_frequency: 1
+  });
 
   useEffect(() => {
     if (!loading && !user) {
@@ -110,7 +123,10 @@ const Feed = () => {
             description,
             invite_code,
             created_at,
-            created_by
+            created_by,
+            automated_news_enabled,
+            news_prompt,
+            update_frequency
           )
         `)
         .eq('user_id', user?.id);
@@ -124,6 +140,12 @@ const Feed = () => {
       if (userGroups.length > 0) {
         setSelectedGroup(userGroups[0]);
         fetchGroupMembers(userGroups[0].id);
+        // Initialize settings form with group data
+        setSettingsForm({
+          automated_news_enabled: userGroups[0].automated_news_enabled || false,
+          news_prompt: userGroups[0].news_prompt || '',
+          update_frequency: userGroups[0].update_frequency || 1
+        });
       }
     } catch (error) {
       console.error('Error fetching groups:', error);
@@ -522,6 +544,56 @@ const Feed = () => {
     }
   };
 
+  const updateGroupSettings = async () => {
+    if (!selectedGroup) return;
+
+    try {
+      const { error } = await supabase
+        .from('groups')
+        .update({
+          automated_news_enabled: settingsForm.automated_news_enabled,
+          news_prompt: settingsForm.news_prompt,
+          update_frequency: settingsForm.update_frequency
+        })
+        .eq('id', selectedGroup.id);
+
+      if (error) throw error;
+
+      // Update the selected group in state
+      setSelectedGroup(prev => prev ? {
+        ...prev,
+        automated_news_enabled: settingsForm.automated_news_enabled,
+        news_prompt: settingsForm.news_prompt,
+        update_frequency: settingsForm.update_frequency
+      } : null);
+
+      // Update the group in the groups array
+      setGroups(prev => prev.map(group => 
+        group.id === selectedGroup.id 
+          ? {
+              ...group,
+              automated_news_enabled: settingsForm.automated_news_enabled,
+              news_prompt: settingsForm.news_prompt,
+              update_frequency: settingsForm.update_frequency
+            }
+          : group
+      ));
+
+      setShowGroupSettings(false);
+      toast({
+        title: "Settings updated!",
+        description: "Group automated news settings have been saved successfully.",
+      });
+    } catch (error) {
+      console.error('Error updating group settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update group settings",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleMentionSelect = (postId: string, email: string) => {
     const currentText = commentInputs[postId] || '';
     const cursorPos = getMentionStartPosition(currentText);
@@ -607,13 +679,19 @@ const Feed = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {groups.map((group) => (
-                    <DropdownMenuItem
-                      key={group.id}
-                      onClick={() => {
-                        setSelectedGroup(group);
-                        fetchGroupMembers(group.id);
-                      }}
-                    >
+                     <DropdownMenuItem
+                       key={group.id}
+                       onClick={() => {
+                         setSelectedGroup(group);
+                         fetchGroupMembers(group.id);
+                         // Update settings form when group changes
+                         setSettingsForm({
+                           automated_news_enabled: group.automated_news_enabled || false,
+                           news_prompt: group.news_prompt || '',
+                           update_frequency: group.update_frequency || 1
+                         });
+                       }}
+                     >
                       {group.name}
                     </DropdownMenuItem>
                   ))}
@@ -790,10 +868,91 @@ const Feed = () => {
                           </DialogContent>
                         </Dialog>
                         
-                        <Button variant="outline" size="sm">
-                          <Settings className="h-4 w-4 mr-2" />
-                          Settings
-                        </Button>
+                         <Dialog open={showGroupSettings} onOpenChange={setShowGroupSettings}>
+                           <DialogTrigger asChild>
+                             <Button variant="outline" size="sm">
+                               <Settings className="h-4 w-4 mr-2" />
+                               Settings
+                             </Button>
+                           </DialogTrigger>
+                           <DialogContent className="max-w-md">
+                             <DialogHeader>
+                               <DialogTitle>Group Settings</DialogTitle>
+                               <DialogDescription>
+                                 Configure automated news settings for {selectedGroup.name}
+                               </DialogDescription>
+                             </DialogHeader>
+                             <div className="space-y-4">
+                               <div className="flex items-center space-x-2">
+                                 <Checkbox 
+                                   id="automated-news"
+                                   checked={settingsForm.automated_news_enabled}
+                                   onCheckedChange={(checked) => 
+                                     setSettingsForm(prev => ({
+                                       ...prev,
+                                       automated_news_enabled: checked as boolean
+                                     }))
+                                   }
+                                 />
+                                 <Label htmlFor="automated-news">Enable Automated News</Label>
+                               </div>
+                               
+                               {settingsForm.automated_news_enabled && (
+                                 <>
+                                   <div className="space-y-2">
+                                     <Label htmlFor="news-prompt">News Topic/Field</Label>
+                                     <Input
+                                       id="news-prompt"
+                                       placeholder="e.g., Technology, Healthcare, Sports"
+                                       value={settingsForm.news_prompt}
+                                       onChange={(e) => 
+                                         setSettingsForm(prev => ({
+                                           ...prev,
+                                           news_prompt: e.target.value
+                                         }))
+                                       }
+                                     />
+                                   </div>
+                                   
+                                   <div className="space-y-3">
+                                     <Label>Update Frequency</Label>
+                                     <RadioGroup 
+                                       value={settingsForm.update_frequency.toString()}
+                                       onValueChange={(value) => 
+                                         setSettingsForm(prev => ({
+                                           ...prev,
+                                           update_frequency: parseInt(value)
+                                         }))
+                                       }
+                                     >
+                                       <div className="flex items-center space-x-2">
+                                         <RadioGroupItem value="1" id="freq-1" />
+                                         <Label htmlFor="freq-1">Every day</Label>
+                                       </div>
+                                       <div className="flex items-center space-x-2">
+                                         <RadioGroupItem value="2" id="freq-2" />
+                                         <Label htmlFor="freq-2">Every 2 days</Label>
+                                       </div>
+                                       <div className="flex items-center space-x-2">
+                                         <RadioGroupItem value="3" id="freq-3" />
+                                         <Label htmlFor="freq-3">Every 3 days</Label>
+                                       </div>
+                                     </RadioGroup>
+                                   </div>
+                                 </>
+                               )}
+                               
+                               <div className="flex justify-end gap-2 pt-4">
+                                 <Button variant="outline" onClick={() => setShowGroupSettings(false)}>
+                                   Cancel
+                                 </Button>
+                                 <Button onClick={() => updateGroupSettings()}>
+                                   Save Settings
+                                 </Button>
+                               </div>
+                             </div>
+                           </DialogContent>
+                         </Dialog>
                       </>
                     )}
                   </div>
