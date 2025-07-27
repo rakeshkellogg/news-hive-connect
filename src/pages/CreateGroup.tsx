@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
 
@@ -16,6 +18,9 @@ const CreateGroup = () => {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [automatedNewsEnabled, setAutomatedNewsEnabled] = useState(false);
+  const [newsPrompt, setNewsPrompt] = useState("");
+  const [updateFrequency, setUpdateFrequency] = useState("1");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,6 +59,9 @@ const CreateGroup = () => {
           name,
           description,
           created_by: authUser.id,
+          automated_news_enabled: automatedNewsEnabled,
+          news_prompt: automatedNewsEnabled ? newsPrompt : null,
+          update_frequency: automatedNewsEnabled ? parseInt(updateFrequency) : null,
         })
         .select()
         .single();
@@ -132,6 +140,55 @@ const CreateGroup = () => {
                     placeholder="Describe what this group is for..."
                     rows={3}
                   />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="automated-news"
+                      checked={automatedNewsEnabled}
+                      onCheckedChange={(checked) => setAutomatedNewsEnabled(checked as boolean)}
+                    />
+                    <Label htmlFor="automated-news">Enable Automated News</Label>
+                  </div>
+
+                  {automatedNewsEnabled && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="news-prompt">News Topic/Field of Interest</Label>
+                        <Input
+                          id="news-prompt"
+                          type="text"
+                          value={newsPrompt}
+                          onChange={(e) => setNewsPrompt(e.target.value)}
+                          placeholder="e.g., Technology, Healthcare, Finance..."
+                          required={automatedNewsEnabled}
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label>Update Frequency</Label>
+                        <RadioGroup 
+                          value={updateFrequency} 
+                          onValueChange={setUpdateFrequency}
+                          className="flex flex-col space-y-2"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="1" id="freq-1" />
+                            <Label htmlFor="freq-1">Every day</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="2" id="freq-2" />
+                            <Label htmlFor="freq-2">Every 2 days</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="3" id="freq-3" />
+                            <Label htmlFor="freq-3">Every 3 days</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    </>
+                  )}
                 </div>
                 
                 <Button type="submit" className="w-full" disabled={loading}>

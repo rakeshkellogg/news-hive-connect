@@ -97,30 +97,39 @@ export type Database = {
       }
       groups: {
         Row: {
+          automated_news_enabled: boolean | null
           created_at: string
           created_by: string
           description: string | null
           id: string
           invite_code: string
           name: string
+          news_prompt: string | null
+          update_frequency: number | null
           updated_at: string
         }
         Insert: {
+          automated_news_enabled?: boolean | null
           created_at?: string
           created_by: string
           description?: string | null
           id?: string
           invite_code?: string
           name: string
+          news_prompt?: string | null
+          update_frequency?: number | null
           updated_at?: string
         }
         Update: {
+          automated_news_enabled?: boolean | null
           created_at?: string
           created_by?: string
           description?: string | null
           id?: string
           invite_code?: string
           name?: string
+          news_prompt?: string | null
+          update_frequency?: number | null
           updated_at?: string
         }
         Relationships: []
