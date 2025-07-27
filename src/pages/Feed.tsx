@@ -32,7 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, AtSign, Settings, Trash2, UserMinus, Crown, Share2, Copy } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy } from "lucide-react";
 
 interface Group {
   id: string;
@@ -925,21 +925,6 @@ const Feed = () => {
                                 {post.comments.length}
                               </Button>
                               
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="gap-2 text-muted-foreground"
-                                onClick={() => {
-                                  const currentText = commentInputs[post.id] || '';
-                                  setCommentInputs(prev => ({
-                                    ...prev,
-                                    [post.id]: currentText + '@'
-                                  }));
-                                }}
-                              >
-                                <AtSign className="h-4 w-4" />
-                                Tag
-                              </Button>
                             </div>
 
                             {/* Comments Section */}
