@@ -15,6 +15,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -84,6 +89,7 @@ const Feed = () => {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [showCreatePost, setShowCreatePost] = useState(false);
+  const [showTagPopover, setShowTagPopover] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -526,6 +532,16 @@ const Feed = () => {
     }
   };
 
+  const handleTagClick = (postId: string, email: string) => {
+    const currentText = commentInputs[postId] || '';
+    const newText = currentText + `@${email} `;
+    setCommentInputs(prev => ({
+      ...prev,
+      [postId]: newText
+    }));
+    setShowTagPopover(null);
+  };
+
   if (loading || loadingGroups) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -870,14 +886,43 @@ const Feed = () => {
                                 {post.comments.length}
                               </Button>
                               
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="gap-2 text-muted-foreground"
+                              <Popover 
+                                open={showTagPopover === post.id} 
+                                onOpenChange={(open) => setShowTagPopover(open ? post.id : null)}
                               >
-                                <AtSign className="h-4 w-4" />
-                                Tag
-                              </Button>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-2 text-muted-foreground"
+                                  >
+                                    <AtSign className="h-4 w-4" />
+                                    Tag
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64" align="start">
+                                  <div className="space-y-2">
+                                    <h4 className="font-medium text-sm">Tag group members</h4>
+                                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                                      {groupMembers.map((member) => (
+                                        <button
+                                          key={member.id}
+                                          onClick={() => handleTagClick(post.id, member.email)}
+                                          className="w-full text-left p-2 rounded-md hover:bg-muted transition-colors flex items-center gap-2"
+                                        >
+                                          <div className="h-6 w-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
+                                            {member.email.charAt(0).toUpperCase()}
+                                          </div>
+                                          <span className="text-sm">{member.email}</span>
+                                          {member.role === 'admin' && (
+                                            <Crown className="h-3 w-3 text-yellow-500 ml-auto" />
+                                          )}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             </div>
 
                             {/* Comments Section */}
