@@ -14,11 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -89,7 +85,7 @@ const Feed = () => {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [showCreatePost, setShowCreatePost] = useState(false);
-  const [showTagPopover, setShowTagPopover] = useState<string | null>(null);
+  const [mentionSuggestions, setMentionSuggestions] = useState<{ postId: string; suggestions: GroupMember[]; position: { top: number; left: number } } | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -414,12 +410,6 @@ const Feed = () => {
     }
   };
 
-  const handleCommentInputChange = (postId: string, value: string) => {
-    setCommentInputs(prev => ({
-      ...prev,
-      [postId]: value
-    }));
-  };
 
   const createPost = async () => {
     if (!newPostContent.trim() || !selectedGroup) return;
@@ -532,14 +522,63 @@ const Feed = () => {
     }
   };
 
-  const handleTagClick = (postId: string, email: string) => {
+  const handleMentionSelect = (postId: string, email: string) => {
     const currentText = commentInputs[postId] || '';
-    const newText = currentText + `@${email} `;
+    const cursorPos = getMentionStartPosition(currentText);
+    if (cursorPos !== -1) {
+      const beforeMention = currentText.substring(0, cursorPos);
+      const afterMention = currentText.substring(cursorPos).replace(/@\w*/, `@${email} `);
+      const newText = beforeMention + afterMention;
+      
+      setCommentInputs(prev => ({
+        ...prev,
+        [postId]: newText
+      }));
+    }
+    setMentionSuggestions(null);
+  };
+
+  const getMentionStartPosition = (text: string) => {
+    const lastAtIndex = text.lastIndexOf('@');
+    if (lastAtIndex === -1) return -1;
+    
+    // Check if there's a space after the @ (meaning it's a complete mention)
+    const textAfterAt = text.substring(lastAtIndex + 1);
+    if (textAfterAt.includes(' ')) return -1;
+    
+    return lastAtIndex;
+  };
+
+  const handleCommentInputChange = (postId: string, value: string, textareaElement?: HTMLTextAreaElement) => {
     setCommentInputs(prev => ({
       ...prev,
-      [postId]: newText
+      [postId]: value
     }));
-    setShowTagPopover(null);
+
+    // Check for mention trigger
+    const mentionStartPos = getMentionStartPosition(value);
+    if (mentionStartPos !== -1) {
+      const mentionText = value.substring(mentionStartPos + 1);
+      const filteredMembers = groupMembers.filter(member => 
+        member.email.toLowerCase().includes(mentionText.toLowerCase())
+      );
+
+      if (filteredMembers.length > 0 && textareaElement) {
+        const rect = textareaElement.getBoundingClientRect();
+        setMentionSuggestions({
+          postId,
+          suggestions: filteredMembers,
+          position: {
+            top: rect.bottom + window.scrollY,
+            left: rect.left + window.scrollX
+          }
+        });
+      } else {
+        setMentionSuggestions(null);
+      }
+    } else {
+      setMentionSuggestions(null);
+    }
   };
 
   if (loading || loadingGroups) {
@@ -886,43 +925,21 @@ const Feed = () => {
                                 {post.comments.length}
                               </Button>
                               
-                              <Popover 
-                                open={showTagPopover === post.id} 
-                                onOpenChange={(open) => setShowTagPopover(open ? post.id : null)}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-2 text-muted-foreground"
+                                onClick={() => {
+                                  const currentText = commentInputs[post.id] || '';
+                                  setCommentInputs(prev => ({
+                                    ...prev,
+                                    [post.id]: currentText + '@'
+                                  }));
+                                }}
                               >
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="gap-2 text-muted-foreground"
-                                  >
-                                    <AtSign className="h-4 w-4" />
-                                    Tag
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-64" align="start">
-                                  <div className="space-y-2">
-                                    <h4 className="font-medium text-sm">Tag group members</h4>
-                                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                                      {groupMembers.map((member) => (
-                                        <button
-                                          key={member.id}
-                                          onClick={() => handleTagClick(post.id, member.email)}
-                                          className="w-full text-left p-2 rounded-md hover:bg-muted transition-colors flex items-center gap-2"
-                                        >
-                                          <div className="h-6 w-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
-                                            {member.email.charAt(0).toUpperCase()}
-                                          </div>
-                                          <span className="text-sm">{member.email}</span>
-                                          {member.role === 'admin' && (
-                                            <Crown className="h-3 w-3 text-yellow-500 ml-auto" />
-                                          )}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
+                                <AtSign className="h-4 w-4" />
+                                Tag
+                              </Button>
                             </div>
 
                             {/* Comments Section */}
@@ -947,26 +964,70 @@ const Feed = () => {
                                 ))}
                                 
                                 {/* Comment Input */}
-                                <div className="flex gap-2 mt-3">
-                                  <Textarea
-                                    placeholder="Write a comment... Use @username to tag someone"
-                                    value={commentInputs[post.id] || ''}
-                                    onChange={(e) => handleCommentInputChange(post.id, e.target.value)}
-                                    className="min-h-[60px] resize-none"
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        addComment(post.id);
-                                      }
-                                    }}
-                                  />
-                                  <Button
-                                    size="sm"
-                                    onClick={() => addComment(post.id)}
-                                    disabled={!commentInputs[post.id]?.trim()}
-                                  >
-                                    <Send className="h-4 w-4" />
-                                  </Button>
+                                <div className="relative">
+                                  <div className="flex gap-2 mt-3">
+                                    <Textarea
+                                      placeholder="Write a comment... Type @ to tag someone"
+                                      value={commentInputs[post.id] || ''}
+                                      onChange={(e) => handleCommentInputChange(post.id, e.target.value, e.target)}
+                                      className="min-h-[60px] resize-none"
+                                      onKeyDown={(e) => {
+                                        if (mentionSuggestions && mentionSuggestions.postId === post.id) {
+                                          if (e.key === 'Escape') {
+                                            setMentionSuggestions(null);
+                                            return;
+                                          }
+                                        }
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                          e.preventDefault();
+                                          if (!mentionSuggestions || mentionSuggestions.postId !== post.id) {
+                                            addComment(post.id);
+                                          }
+                                        }
+                                      }}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => addComment(post.id)}
+                                      disabled={!commentInputs[post.id]?.trim()}
+                                    >
+                                      <Send className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Mention Suggestions */}
+                                  {mentionSuggestions && mentionSuggestions.postId === post.id && (
+                                    <div 
+                                      className="absolute z-50 w-64 bg-background border border-border rounded-md shadow-lg mt-1"
+                                      style={{
+                                        top: '100%',
+                                        left: 0
+                                      }}
+                                    >
+                                      <Command>
+                                        <CommandList>
+                                          <CommandEmpty>No members found.</CommandEmpty>
+                                          <CommandGroup>
+                                            {mentionSuggestions.suggestions.map((member) => (
+                                              <CommandItem
+                                                key={member.id}
+                                                onSelect={() => handleMentionSelect(post.id, member.email)}
+                                                className="flex items-center gap-2 cursor-pointer"
+                                              >
+                                                <div className="h-6 w-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
+                                                  {member.email.charAt(0).toUpperCase()}
+                                                </div>
+                                                <span className="text-sm">{member.email}</span>
+                                                {member.role === 'admin' && (
+                                                  <Crown className="h-3 w-3 text-yellow-500 ml-auto" />
+                                                )}
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             )}
