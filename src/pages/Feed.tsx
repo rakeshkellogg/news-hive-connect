@@ -32,7 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -594,6 +594,36 @@ const Feed = () => {
     }
   };
 
+  const generateNews = async () => {
+    if (!selectedGroup || !selectedGroup.automated_news_enabled) return;
+
+    try {
+      toast({
+        title: "Generating news...",
+        description: "Please wait while we fetch the latest updates.",
+      });
+
+      const { data, error } = await supabase.functions.invoke('generate-news');
+
+      if (error) throw error;
+
+      // Refresh posts to show the new news
+      await fetchPosts(selectedGroup.id);
+
+      toast({
+        title: "News generated!",
+        description: "Latest news has been added to the group.",
+      });
+    } catch (error) {
+      console.error('Error generating news:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate news. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleMentionSelect = (postId: string, email: string) => {
     const currentText = commentInputs[postId] || '';
     const cursorPos = getMentionStartPosition(currentText);
@@ -960,46 +990,59 @@ const Feed = () => {
               </div>
             )}
 
-            {/* Posts Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold">Latest Updates</h3>
-                <Dialog open={showCreatePost} onOpenChange={setShowCreatePost}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Post
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create New Post</DialogTitle>
-                      <DialogDescription>
-                        Share something with {selectedGroup?.name}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <Textarea
-                        placeholder="What's on your mind?"
-                        value={newPostContent}
-                        onChange={(e) => setNewPostContent(e.target.value)}
-                        className="min-h-[120px]"
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setShowCreatePost(false)}>
-                          Cancel
-                        </Button>
-                        <Button 
-                          onClick={createPost}
-                          disabled={!newPostContent.trim()}
-                        >
-                          Post
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
+               {/* Posts Section */}
+             <div className="space-y-4">
+               <div className="flex items-center justify-between">
+                 <h3 className="text-xl font-semibold">Latest Updates</h3>
+                 <div className="flex gap-2">
+                   {/* Generate News Button - Only for admins with automated news enabled */}
+                   {isGroupAdmin(selectedGroup) && selectedGroup?.automated_news_enabled && (
+                     <Button 
+                       variant="outline"
+                       onClick={generateNews}
+                     >
+                       <Newspaper className="h-4 w-4 mr-2" />
+                       Generate News
+                     </Button>
+                   )}
+                   
+                   <Dialog open={showCreatePost} onOpenChange={setShowCreatePost}>
+                     <DialogTrigger asChild>
+                       <Button>
+                         <Plus className="h-4 w-4 mr-2" />
+                         Create Post
+                       </Button>
+                     </DialogTrigger>
+                     <DialogContent>
+                       <DialogHeader>
+                         <DialogTitle>Create New Post</DialogTitle>
+                         <DialogDescription>
+                           Share something with {selectedGroup?.name}
+                         </DialogDescription>
+                       </DialogHeader>
+                       <div className="space-y-4">
+                         <Textarea
+                           placeholder="What's on your mind?"
+                           value={newPostContent}
+                           onChange={(e) => setNewPostContent(e.target.value)}
+                           className="min-h-[120px]"
+                         />
+                         <div className="flex justify-end gap-2">
+                           <Button variant="outline" onClick={() => setShowCreatePost(false)}>
+                             Cancel
+                           </Button>
+                           <Button 
+                             onClick={createPost}
+                             disabled={!newPostContent.trim()}
+                           >
+                             Post
+                           </Button>
+                         </div>
+                       </div>
+                     </DialogContent>
+                   </Dialog>
+                 </div>
+               </div>
               
               {posts.length === 0 ? (
                 <div className="text-center py-8">
