@@ -56,48 +56,65 @@ serve(async (req) => {
           continue;
         }
 
-        // Generate news using Perplexity
-        const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${perplexityApiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'llama-3.1-sonar-large-128k-online',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a news curator. Provide concise, informative updates in a professional tone. Focus on recent developments and key insights.'
-              },
-              {
-                role: 'user',
-                content: `Generate a brief news update (2-3 paragraphs) about: ${group.news_prompt}. Focus on the most recent and significant developments.`
-              }
-            ],
-            temperature: 0.2,
-            top_p: 0.9,
-            max_tokens: 2000,
-            return_images: false,
-            return_related_questions: false,
-            search_recency_filter: 'day',
-            frequency_penalty: 1,
-            presence_penalty: 0
-          })
-        });
+        // Generate news using Perplexity with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-        if (!perplexityResponse.ok) {
-          const errorText = await perplexityResponse.text();
-          console.error(`Perplexity API error for group ${group.name}:`, errorText);
-          continue;
-        }
+        let newsContent;
+        try {
+          const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${perplexityApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              model: 'llama-3.1-sonar-large-128k-online',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a news curator. Provide concise, informative updates in a professional tone. Focus on recent developments and key insights.'
+                },
+                {
+                  role: 'user',
+                  content: `Generate a brief news update (2-3 paragraphs) about: ${group.news_prompt}. Focus on the most recent and significant developments.`
+                }
+              ],
+              temperature: 0.2,
+              top_p: 0.9,
+              max_tokens: 2000,
+              return_images: false,
+              return_related_questions: false,
+              search_recency_filter: 'day',
+              frequency_penalty: 1,
+              presence_penalty: 0
+            })
+          });
 
-        const perplexityData = await perplexityResponse.json();
-        const newsContent = perplexityData.choices?.[0]?.message?.content;
+          clearTimeout(timeoutId);
 
-        if (!newsContent) {
-          console.log(`No content returned for group ${group.name}`);
-          continue;
+          if (!perplexityResponse.ok) {
+            const errorText = await perplexityResponse.text();
+            console.error(`Perplexity API error for group ${group.name}:`, errorText);
+            continue;
+          }
+
+          const perplexityData = await perplexityResponse.json();
+          newsContent = perplexityData.choices?.[0]?.message?.content;
+
+          if (!newsContent) {
+            console.log(`No content returned for group ${group.name}`);
+            continue;
+          }
+
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            console.error(`Timeout error for group ${group.name}`);
+            continue;
+          }
+          throw fetchError;
         }
 
         // Create news post in the group
