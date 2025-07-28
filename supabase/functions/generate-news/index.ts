@@ -70,7 +70,7 @@ serve(async (req) => {
             },
             signal: controller.signal,
             body: JSON.stringify({
-              model: 'llama-3.1-sonar-large-128k-online',
+              model: 'sonar-small-online',
               messages: [
                 {
                   role: 'system',
