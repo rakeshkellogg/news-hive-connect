@@ -77,10 +77,10 @@ serve(async (req) => {
             ],
             temperature: 0.2,
             top_p: 0.9,
-            max_tokens: 1000,
+            max_tokens: 2000,
             return_images: false,
             return_related_questions: false,
-            search_recency_filter: 'month',
+            search_recency_filter: 'day',
             frequency_penalty: 1,
             presence_penalty: 0
           }),
