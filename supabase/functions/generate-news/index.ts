@@ -57,11 +57,11 @@ serve(async (req) => {
         }
 
         // Generate news using Perplexity
-        const newsResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+        const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${perplexityApiKey}`,
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             model: 'llama-3.1-sonar-small-128k-online',
@@ -83,18 +83,21 @@ serve(async (req) => {
             search_recency_filter: 'day',
             frequency_penalty: 1,
             presence_penalty: 0
-          }),
+          })
         });
 
-        if (!newsResponse.ok) {
-          throw new Error(`Perplexity API error: ${newsResponse.statusText}`);
+        if (!perplexityResponse.ok) {
+          const errorText = await perplexityResponse.text();
+          console.error(`Perplexity API error for group ${group.name}:`, errorText);
+          continue;
         }
 
-        const newsData = await newsResponse.json();
-        const newsContent = newsData.choices?.[0]?.message?.content;
+        const perplexityData = await perplexityResponse.json();
+        const newsContent = perplexityData.choices?.[0]?.message?.content;
 
         if (!newsContent) {
-          throw new Error('No content generated from Perplexity');
+          console.log(`No content returned for group ${group.name}`);
+          continue;
         }
 
         // Create news post in the group
