@@ -75,12 +75,12 @@ serve(async (req) => {
                 content: `Generate a brief news update (2-3 paragraphs) about: ${group.news_prompt}. Focus on the most recent and significant developments.`
               }
             ],
-            temperature: 0.3,
+            temperature: 0.2,
             top_p: 0.9,
-            max_tokens: 800,
+            max_tokens: 1000,
             return_images: false,
             return_related_questions: false,
-            search_recency_filter: 'week',
+            search_recency_filter: 'month',
             frequency_penalty: 1,
             presence_penalty: 0
           }),
