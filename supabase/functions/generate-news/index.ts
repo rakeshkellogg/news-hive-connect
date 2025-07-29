@@ -70,7 +70,7 @@ serve(async (req) => {
             },
             signal: controller.signal,
             body: JSON.stringify({
-              model: 'sonar-small-online',
+              model: 'sonar',
               messages: [
                 {
                   role: 'system',
