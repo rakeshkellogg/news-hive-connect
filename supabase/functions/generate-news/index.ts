@@ -65,7 +65,13 @@ serve(async (req) => {
                 },
                 {
                   role: 'user',
-                  content: `Generate a brief news update (2-3 paragraphs) about: ${group.news_prompt}. Focus on the most recent and significant developments.`
+                  content: `Find the 10 most recent news articles about: ${group.news_prompt}. For each article, return a JSON object with:
+- title
+- url (if available)
+- published_date (YYYY-MM-DD)
+- summary (maximum 30 words)
+
+Return a JSON array of these objects only, without explanation.`
                 }
               ],
               temperature: 0.2,
@@ -104,24 +110,40 @@ serve(async (req) => {
           throw fetchError;
         }
 
-        // Create news post in the group
+        // Parse JSON response and create individual posts
+        let newsArticles;
+        try {
+          newsArticles = JSON.parse(newsContent);
+        } catch (parseError) {
+          console.error(`Failed to parse JSON for group ${group.name}:`, parseError);
+          continue;
+        }
+
+        if (!Array.isArray(newsArticles)) {
+          console.error(`Invalid response format for group ${group.name}`);
+          continue;
+        }
+
+        // Create individual posts for each news article
+        const postsToInsert = newsArticles.slice(0, 10).map(article => ({
+          content: `📰 **${article.title}**\n\n${article.summary}\n\n📅 Published: ${article.published_date}${article.url ? `\n🔗 [Read more](${article.url})` : ''}`,
+          group_id: group.id,
+          user_id: group.created_by // System posts by group creator
+        }));
+
         const { error: postError } = await supabaseClient
           .from('posts')
-          .insert({
-            content: `📰 **Automated News Update**\n\n${newsContent}`,
-            group_id: group.id,
-            user_id: group.created_by // System posts by group creator
-          });
+          .insert(postsToInsert);
 
         if (postError) {
-          console.error(`Error creating post for group ${group.name}:`, postError);
+          console.error(`Error creating posts for group ${group.name}:`, postError);
           throw postError;
         }
 
         results.push({
           group: group.name,
           status: 'success',
-          message: 'News post created successfully'
+          message: `Created ${postsToInsert.length} news posts successfully`
         });
 
         console.log(`Generated news for group: ${group.name}`);
