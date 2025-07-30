@@ -35,11 +35,23 @@ serve(async (req) => {
         .select('*')
         .eq('id', groupId)
         .eq('automated_news_enabled', true)
-        .single();
+        .maybeSingle();
 
-      if (groupError || !groupData) {
-        throw new Error(`Group not found or automated news not enabled for group: ${groupId}`);
+      if (groupError) {
+        console.error('Error fetching group:', groupError);
+        throw groupError;
       }
+      
+      if (!groupData) {
+        console.log(`Group not found or automated news not enabled for group: ${groupId}`);
+        return new Response(JSON.stringify({ 
+          message: 'Group not found or automated news not enabled', 
+          results: [] 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       groups = [groupData];
     } else {
       // Get all groups with automated news enabled (for scheduled generation)
