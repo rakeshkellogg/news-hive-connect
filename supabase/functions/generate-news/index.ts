@@ -38,23 +38,10 @@ serve(async (req) => {
 
     for (const group of groups || []) {
       try {
-        // Check if we should generate news based on frequency
-        const { data: lastPost } = await supabaseClient
-          .from('posts')
-          .select('created_at')
-          .eq('group_id', group.id)
-          .eq('user_id', group.created_by) // System posts by group creator
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        const shouldGenerate = lastPost?.[0] 
-          ? new Date().getTime() - new Date(lastPost[0].created_at).getTime() >= (group.update_frequency * 24 * 60 * 60 * 1000)
-          : true;
-
-        if (!shouldGenerate) {
-          console.log(`Skipping ${group.name} - too soon for next update`);
-          continue;
-        }
+        // For manual generation (via API call), always generate
+        // For automated scheduled generation, check frequency
+        // Since this function can be called both manually and on schedule,
+        // we'll always generate for now (frequency checking can be added to a scheduler)
 
         // Generate news using Perplexity with timeout
         const controller = new AbortController();
