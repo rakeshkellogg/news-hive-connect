@@ -65,7 +65,7 @@ serve(async (req) => {
                 },
                 {
                   role: 'user',
-                  content: `Find the 10 most recent news articles about: ${group.news_prompt}. For each article, return a JSON object with:
+                  content: `Find the ${group.news_count || 10} most recent news articles about: ${group.news_prompt}. For each article, return a JSON object with:
 - title
 - url (if available)
 - published_date (YYYY-MM-DD)
@@ -125,7 +125,7 @@ Return a JSON array of these objects only, without explanation.`
         }
 
         // Create individual posts for each news article
-        const postsToInsert = newsArticles.slice(0, 10).map(article => ({
+        const postsToInsert = newsArticles.slice(0, group.news_count || 10).map(article => ({
           content: `📰 **${article.title}**\n\n${article.summary}\n\n📅 Published: ${article.published_date}${article.url ? `\n🔗 [Read more](${article.url})` : ''}`,
           group_id: group.id,
           user_id: group.created_by // System posts by group creator

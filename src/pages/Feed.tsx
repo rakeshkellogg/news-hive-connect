@@ -49,6 +49,7 @@ interface Group {
   automated_news_enabled?: boolean;
   news_prompt?: string;
   update_frequency?: number;
+  news_count?: number;
 }
 
 interface Post {
@@ -97,7 +98,8 @@ const Feed = () => {
   const [settingsForm, setSettingsForm] = useState({
     automated_news_enabled: false,
     news_prompt: '',
-    update_frequency: 1
+    update_frequency: 1,
+    news_count: 10
   });
 
   useEffect(() => {
@@ -126,7 +128,8 @@ const Feed = () => {
             created_by,
             automated_news_enabled,
             news_prompt,
-            update_frequency
+            update_frequency,
+            news_count
           )
         `)
         .eq('user_id', user?.id);
@@ -144,7 +147,8 @@ const Feed = () => {
         setSettingsForm({
           automated_news_enabled: userGroups[0].automated_news_enabled || false,
           news_prompt: userGroups[0].news_prompt || '',
-          update_frequency: userGroups[0].update_frequency || 1
+          update_frequency: userGroups[0].update_frequency || 1,
+          news_count: userGroups[0].news_count || 10
         });
       }
     } catch (error) {
@@ -553,7 +557,8 @@ const Feed = () => {
         .update({
           automated_news_enabled: settingsForm.automated_news_enabled,
           news_prompt: settingsForm.news_prompt,
-          update_frequency: settingsForm.update_frequency
+          update_frequency: settingsForm.update_frequency,
+          news_count: settingsForm.news_count
         })
         .eq('id', selectedGroup.id);
 
@@ -564,7 +569,8 @@ const Feed = () => {
         ...prev,
         automated_news_enabled: settingsForm.automated_news_enabled,
         news_prompt: settingsForm.news_prompt,
-        update_frequency: settingsForm.update_frequency
+        update_frequency: settingsForm.update_frequency,
+        news_count: settingsForm.news_count
       } : null);
 
       // Update the group in the groups array
@@ -574,7 +580,8 @@ const Feed = () => {
               ...group,
               automated_news_enabled: settingsForm.automated_news_enabled,
               news_prompt: settingsForm.news_prompt,
-              update_frequency: settingsForm.update_frequency
+              update_frequency: settingsForm.update_frequency,
+              news_count: settingsForm.news_count
             }
           : group
       ));
@@ -715,11 +722,12 @@ const Feed = () => {
                          setSelectedGroup(group);
                          fetchGroupMembers(group.id);
                          // Update settings form when group changes
-                         setSettingsForm({
-                           automated_news_enabled: group.automated_news_enabled || false,
-                           news_prompt: group.news_prompt || '',
-                           update_frequency: group.update_frequency || 1
-                         });
+                          setSettingsForm({
+                            automated_news_enabled: group.automated_news_enabled || false,
+                            news_prompt: group.news_prompt || '',
+                            update_frequency: group.update_frequency || 1,
+                            news_count: group.news_count || 10
+                          });
                        }}
                      >
                       {group.name}
@@ -968,9 +976,27 @@ const Feed = () => {
                                          <Label htmlFor="freq-3">Every 3 days</Label>
                                        </div>
                                      </RadioGroup>
-                                   </div>
-                                 </>
-                               )}
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                      <Label htmlFor="news-count">Number of News Articles</Label>
+                                      <Input
+                                        id="news-count"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        placeholder="10"
+                                        value={settingsForm.news_count}
+                                        onChange={(e) => 
+                                          setSettingsForm(prev => ({
+                                            ...prev,
+                                            news_count: parseInt(e.target.value) || 10
+                                          }))
+                                        }
+                                      />
+                                    </div>
+                                  </>
+                                )}
                                
                                <div className="flex justify-end gap-2 pt-4">
                                  <Button variant="outline" onClick={() => setShowGroupSettings(false)}>

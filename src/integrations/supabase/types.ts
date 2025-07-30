@@ -104,6 +104,7 @@ export type Database = {
           id: string
           invite_code: string
           name: string
+          news_count: number
           news_prompt: string | null
           update_frequency: number | null
           updated_at: string
@@ -116,6 +117,7 @@ export type Database = {
           id?: string
           invite_code?: string
           name: string
+          news_count?: number
           news_prompt?: string | null
           update_frequency?: number | null
           updated_at?: string
@@ -128,6 +130,7 @@ export type Database = {
           id?: string
           invite_code?: string
           name?: string
+          news_count?: number
           news_prompt?: string | null
           update_frequency?: number | null
           updated_at?: string
