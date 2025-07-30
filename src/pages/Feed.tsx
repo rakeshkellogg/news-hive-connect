@@ -610,7 +610,9 @@ const Feed = () => {
         description: "Please wait while we fetch the latest updates.",
       });
 
-      const { data, error } = await supabase.functions.invoke('generate-news');
+      const { data, error } = await supabase.functions.invoke('generate-news', {
+        body: { groupId: selectedGroup.id }
+      });
 
       if (error) throw error;
 
@@ -619,7 +621,7 @@ const Feed = () => {
 
       toast({
         title: "News generated!",
-        description: "Latest news has been added to the group.",
+        description: `Latest news has been added to the group. Generated ${data?.results?.[0]?.message || 'news posts'}.`,
       });
     } catch (error) {
       console.error('Error generating news:', error);

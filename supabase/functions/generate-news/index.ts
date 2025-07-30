@@ -23,15 +23,36 @@ serve(async (req) => {
       throw new Error('PERPLEXITY_API_KEY is not configured');
     }
 
-    // Get all groups with automated news enabled
-    const { data: groups, error: groupsError } = await supabaseClient
-      .from('groups')
-      .select('*')
-      .eq('automated_news_enabled', true);
+    // Get the request body to check for specific group ID
+    const body = await req.json().catch(() => ({}));
+    const { groupId } = body;
 
-    if (groupsError) {
-      console.error('Error fetching groups:', groupsError);
-      throw groupsError;
+    let groups;
+    if (groupId) {
+      // Generate news for specific group
+      const { data: groupData, error: groupError } = await supabaseClient
+        .from('groups')
+        .select('*')
+        .eq('id', groupId)
+        .eq('automated_news_enabled', true)
+        .single();
+
+      if (groupError || !groupData) {
+        throw new Error(`Group not found or automated news not enabled for group: ${groupId}`);
+      }
+      groups = [groupData];
+    } else {
+      // Get all groups with automated news enabled (for scheduled generation)
+      const { data: groupsData, error: groupsError } = await supabaseClient
+        .from('groups')
+        .select('*')
+        .eq('automated_news_enabled', true);
+
+      if (groupsError) {
+        console.error('Error fetching groups:', groupsError);
+        throw groupsError;
+      }
+      groups = groupsData;
     }
 
     const results = [];
