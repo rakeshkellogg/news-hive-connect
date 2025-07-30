@@ -146,9 +146,15 @@ Return a JSON array of these objects only, without explanation.`
         // Parse JSON response and create individual posts
         let newsArticles;
         try {
-          newsArticles = JSON.parse(newsContent);
+          // Remove markdown code blocks if present
+          let cleanContent = newsContent;
+          if (newsContent.includes('```json')) {
+            cleanContent = newsContent.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+          }
+          newsArticles = JSON.parse(cleanContent);
         } catch (parseError) {
           console.error(`Failed to parse JSON for group ${group.name}:`, parseError);
+          console.error(`Content was:`, newsContent);
           continue;
         }
 
