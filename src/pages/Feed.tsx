@@ -62,6 +62,7 @@ interface Post {
   liked: boolean;
   comments: Comment[];
   image_url?: string;
+  url?: string;
 }
 
 interface Comment {
@@ -230,6 +231,7 @@ const Feed = () => {
         .select(`
           id,
           content,
+          url,
           created_at,
           user_id,
           profiles!posts_user_id_fkey (
@@ -279,7 +281,8 @@ const Feed = () => {
           return {
             id: post.id,
             content: post.content,
-            author: post.profiles?.email || 'Unknown User',
+            url: post.url,
+            author: isAutomatedPost ? 'AI News Bot' : (post.profiles?.email || 'Unknown User'),
             created_at: post.created_at,
             type: isAutomatedPost ? 'automated' as const : 'user' as const,
             likes: likesCount || 0,
@@ -1087,47 +1090,33 @@ const Feed = () => {
                     // Parse news post content for better formatting
                     const isNewsPost = post.type === 'automated' && post.content.includes('🤖 AI News Bot');
                     let postTitle = '';
-                    let postSummary = '';
-                    let postUrl = '';
-                    
-                    if (isNewsPost) {
-                      const lines = post.content.split('\n').filter(line => line.trim());
-                      
-                      // Remove the old link format lines that contain 🔗 or "Powered by AI News Bot"
-                      const cleanedLines = lines.filter(line => 
-                        !line.includes('🔗') && 
-                        !line.includes('Powered by AI News Bot') &&
-                        !line.includes('**[Read Full Article]')
-                      );
-                      
-                      // Extract title from the first actual content line (skip bot identifier)
-                      const titleLine = cleanedLines.find(line => 
-                        !line.includes('🤖') && 
-                        !line.includes('📰') && 
-                        !line.includes('AI News Bot') &&
-                        line.length > 10
-                      );
-                      postTitle = titleLine || 'News Update';
-                      
-                      // Extract summary (content between title and URL)
-                      const titleIndex = cleanedLines.findIndex(line => line === titleLine);
-                      const urlLineIndex = cleanedLines.findIndex(line => line.includes('http'));
-                      if (titleIndex >= 0 && urlLineIndex > titleIndex) {
-                        postSummary = cleanedLines.slice(titleIndex + 1, urlLineIndex).join(' ').trim();
-                      } else if (titleIndex >= 0) {
-                        // If no URL found, get content after title
-                        const remainingLines = cleanedLines.slice(titleIndex + 1);
-                        const nonUrlLines = remainingLines.filter(line => !line.includes('http'));
-                        postSummary = nonUrlLines.join(' ').trim();
-                      }
-                      
-                      // Extract URL from original content (before cleaning)
-                      const urlLine = lines.find(line => line.includes('http'));
-                      if (urlLine) {
-                        const urlMatch = urlLine.match(/https?:\/\/[^\s\)]+/);
-                        postUrl = urlMatch ? urlMatch[0] : '';
-                      }
-                    }
+                     let postSummary = '';
+                     
+                     if (isNewsPost) {
+                       const lines = post.content.split('\n').filter(line => line.trim());
+                       
+                       // Extract title (look for lines starting with ** or 📰)
+                       const titleLine = lines.find(line => 
+                         (line.includes('**') && !line.includes('🤖') && !line.includes('AI News Bot')) ||
+                         (line.includes('📰') && line.includes('**'))
+                       );
+                       if (titleLine) {
+                         postTitle = titleLine.replace(/[\*📰]/g, '').trim();
+                       }
+                       
+                       // Extract summary (content after title but before bot info and date)
+                       const titleIndex = lines.findIndex(line => line === titleLine);
+                       if (titleIndex >= 0) {
+                         const contentLines = lines.slice(titleIndex + 1);
+                         const summaryLines = contentLines.filter(line => 
+                           !line.includes('🤖') && 
+                           !line.includes('AI News Bot') &&
+                           !line.includes('📅') &&
+                           line.trim().length > 0
+                         );
+                         postSummary = summaryLines.join(' ').trim();
+                       }
+                     }
                     
                     return (
                       <div key={post.id} className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden hover:shadow-xl transition-all duration-300">
@@ -1201,18 +1190,18 @@ const Feed = () => {
                                   <p className="text-gray-600 text-sm leading-relaxed mb-3">
                                     {postSummary}
                                   </p>
-                                )}
-                                {postUrl && (
-                                  <a 
-                                    href={postUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center text-indigo-600 hover:text-purple-600 text-sm font-medium transition-colors duration-200"
-                                  >
-                                    <ExternalLink className="w-4 h-4 mr-1" />
-                                    Read full article
-                                  </a>
-                                )}
+                                 )}
+                                 {post.url && (
+                                   <a 
+                                     href={post.url} 
+                                     target="_blank" 
+                                     rel="noopener noreferrer"
+                                     className="inline-flex items-center text-indigo-600 hover:text-purple-600 text-sm font-medium transition-colors duration-200"
+                                   >
+                                     <ExternalLink className="w-4 h-4 mr-1" />
+                                     Read full article
+                                   </a>
+                                 )}
                               </div>
 
                               {/* Side Thumbnail */}

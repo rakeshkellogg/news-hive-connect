@@ -201,20 +201,18 @@ Return a JSON array of these objects only, without explanation.`
             thumbnailUrl = await generateThumbnailImage(article.title, openAIApiKey);
           }
           
-          // Create catchy, well-formatted post content
-          const postContent = `🤖 **AI News Bot** • ${new Date(article.published_date).toLocaleDateString()}
-
-**${article.title}** 
+          // Create clean post content without URL
+          const postContent = `📰 **${article.title}**
 
 ${article.summary}
 
-${article.url ? `🔗 **[Read Full Article](${article.url})**` : ''}
+🤖 AI News Bot
 
----
-*Powered by AI News Bot*`;
+📅 Published: ${new Date(article.published_date).toLocaleDateString()}`;
 
           postsToInsert.push({
             content: postContent,
+            url: article.url || null, // Store URL separately for the clickable button
             group_id: group.id,
             user_id: group.created_by, // System posts by group creator
             image_url: thumbnailUrl
