@@ -1120,10 +1120,10 @@ const Feed = () => {
                                 {post.author.charAt(0)}
                               </div>
                             )}
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-indigo-900">
-                                {post.type === 'automated' ? '🤖 AI News Bot' : post.author}
-                              </h3>
+                             <div className="flex-1">
+                               <h3 className="font-semibold text-indigo-900">
+                                 {post.type === 'automated' ? 'AI News Bot' : post.author}
+                               </h3>
                               <div className="flex items-center text-sm text-indigo-600">
                                 <Clock className="w-4 h-4 mr-1" />
                                 {new Date(post.created_at).toLocaleDateString('en-US', {
