@@ -32,7 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper, ExternalLink, UserPlus } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper, ExternalLink, UserPlus, Clock, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1109,219 +1109,251 @@ const Feed = () => {
                     }
                     
                     return (
-                      <Card key={post.id} className="overflow-hidden">
-                        <CardContent className="pt-6">
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0">
-                              {post.type === 'automated' ? (
-                                <Bot className="h-8 w-8 text-primary" />
-                              ) : (
-                                <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                                  {post.author.charAt(0)}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-semibold">
-                                  {post.type === 'automated' ? '🤖 AI News Bot' : post.author}
-                                </span>
-                                <span className="text-sm text-muted-foreground">
-                                  {new Date(post.created_at).toLocaleTimeString('en-US', {
-                                    hour: 'numeric',
-                                    minute: '2-digit',
-                                    hour12: true
-                                  })} · {new Date(post.created_at).toLocaleDateString('en-US', {
-                                    day: 'numeric',
-                                    month: 'short'
-                                  })}
-                                </span>
-                                
-                                {/* Admin Delete Button */}
-                                {isGroupAdmin(selectedGroup) && (
-                                  <div className="ml-auto">
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>Delete Post</AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                            Are you sure you want to delete this post? This action cannot be undone.
-                                          </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                          <AlertDialogAction onClick={() => deletePost(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                            Delete
-                                          </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {isNewsPost ? (
-                                <div className="flex items-start gap-4">
-                                  <div className="flex-1">
-                                    <h3 className="text-lg font-semibold text-foreground mb-3 leading-tight">
-                                      {postTitle}
-                                    </h3>
-                                    {postSummary && (
-                                      <p className="text-muted-foreground mb-4 leading-relaxed">
-                                        {postSummary}
-                                      </p>
-                                    )}
-                                    {postUrl && (
-                                      <a 
-                                        href={postUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium"
-                                      >
-                                        <ExternalLink className="h-4 w-4" />
-                                        Read full article
-                                      </a>
-                                    )}
-                                  </div>
-                                  {post.image_url && (
-                                    <div className="flex-shrink-0 w-24 h-24 bg-muted rounded-lg overflow-hidden">
-                                      <img 
-                                        src={post.image_url} 
-                                        alt="Article thumbnail"
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                        }}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="text-foreground mb-4">{post.content}</p>
-                              )}
-                            </div>
-                          </div>
-                            
-                            {/* Action Buttons */}
-                            <div className="flex items-center gap-4 pb-3 border-b">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleLike(post.id)}
-                                className={`gap-2 ${post.liked ? 'text-red-500' : 'text-muted-foreground'}`}
-                              >
-                                <Heart className={`h-4 w-4 ${post.liked ? 'fill-current' : ''}`} />
-                                {post.likes}
-                              </Button>
-                              
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleComments(post.id)}
-                                className="gap-2 text-muted-foreground"
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                                {post.comments.length}
-                              </Button>
-                              
-                            </div>
-
-                            {/* Comments Section */}
-                            {expandedComments.has(post.id) && (
-                              <div className="mt-4 space-y-3 animate-fade-in">
-                                {/* Existing Comments */}
-                                {post.comments.map((comment) => (
-                                  <div key={comment.id} className="flex gap-3 pl-2">
-                                    <div className="h-6 w-6 bg-muted rounded-full flex items-center justify-center text-xs font-semibold">
-                                      {comment.author.charAt(0)}
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-sm font-medium">{comment.author}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                          {new Date(comment.created_at).toLocaleString()}
-                                        </span>
-                                      </div>
-                                      <p className="text-sm text-foreground">{comment.content}</p>
-                                    </div>
-                                  </div>
-                                ))}
-                                
-                                {/* Comment Input */}
-                                <div className="relative">
-                                  <div className="flex gap-2 mt-3">
-                                    <Textarea
-                                      placeholder="Write a comment... Type @ to tag someone"
-                                      value={commentInputs[post.id] || ''}
-                                      onChange={(e) => handleCommentInputChange(post.id, e.target.value, e.target)}
-                                      className="min-h-[60px] resize-none"
-                                      onKeyDown={(e) => {
-                                        if (mentionSuggestions && mentionSuggestions.postId === post.id) {
-                                          if (e.key === 'Escape') {
-                                            setMentionSuggestions(null);
-                                            return;
-                                          }
-                                        }
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                          e.preventDefault();
-                                          if (!mentionSuggestions || mentionSuggestions.postId !== post.id) {
-                                            addComment(post.id);
-                                          }
-                                        }
-                                      }}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      onClick={() => addComment(post.id)}
-                                      disabled={!commentInputs[post.id]?.trim()}
-                                    >
-                                      <Send className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                  
-                                  {/* Mention Suggestions */}
-                                  {mentionSuggestions && mentionSuggestions.postId === post.id && (
-                                    <div 
-                                      className="absolute z-50 w-64 bg-background border border-border rounded-md shadow-lg mt-1"
-                                      style={{
-                                        top: '100%',
-                                        left: 0
-                                      }}
-                                    >
-                                      <Command>
-                                        <CommandList>
-                                          <CommandEmpty>No members found.</CommandEmpty>
-                                          <CommandGroup>
-                                            {mentionSuggestions.suggestions.map((member) => (
-                                              <CommandItem
-                                                key={member.id}
-                                                onSelect={() => handleMentionSelect(post.id, member.email)}
-                                                className="flex items-center gap-2 cursor-pointer"
-                                              >
-                                                <div className="h-6 w-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
-                                                  {member.email.charAt(0).toUpperCase()}
-                                                </div>
-                                                <span className="text-sm">{member.email}</span>
-                                                {member.role === 'admin' && (
-                                                  <Crown className="h-3 w-3 text-yellow-500 ml-auto" />
-                                                )}
-                                              </CommandItem>
-                                            ))}
-                                          </CommandGroup>
-                                        </CommandList>
-                                      </Command>
-                                    </div>
-                                  )}
-                                </div>
+                      <div key={post.id} className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden hover:shadow-xl transition-all duration-300">
+                        {/* Post Header */}
+                        <div className="p-4 pb-3 bg-gradient-to-r from-indigo-50 to-purple-50">
+                          <div className="flex items-center space-x-3">
+                            {post.type === 'automated' ? (
+                              <Bot className="w-10 h-10 text-primary ring-2 ring-indigo-200 rounded-full p-2 bg-white" />
+                            ) : (
+                              <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm ring-2 ring-indigo-200">
+                                {post.author.charAt(0)}
                               </div>
                             )}
-                        </CardContent>
-                      </Card>
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-indigo-900">
+                                {post.type === 'automated' ? '🤖 AI News Bot' : post.author}
+                              </h3>
+                              <div className="flex items-center text-sm text-indigo-600">
+                                <Clock className="w-4 h-4 mr-1" />
+                                {new Date(post.created_at).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })} · {new Date(post.created_at).toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                  hour12: true
+                                })}
+                              </div>
+                            </div>
+                            
+                            {/* Admin Delete Button */}
+                            {isGroupAdmin(selectedGroup) && (
+                              <div className="ml-auto">
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Post</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete this post? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => deletePost(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Post Content with Side Thumbnail */}
+                        <div className="px-4 pb-3">
+                          {isNewsPost ? (
+                            <div className="flex gap-4">
+                              {/* Text Content */}
+                              <div className="flex-1">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-2 leading-tight">
+                                  {postTitle}
+                                </h2>
+                                {postSummary && (
+                                  <p className="text-gray-600 text-sm leading-relaxed mb-3">
+                                    {postSummary}
+                                  </p>
+                                )}
+                                {postUrl && (
+                                  <a 
+                                    href={postUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center text-indigo-600 hover:text-purple-600 text-sm font-medium transition-colors duration-200"
+                                  >
+                                    <ExternalLink className="w-4 h-4 mr-1" />
+                                    Read full article
+                                  </a>
+                                )}
+                              </div>
+
+                              {/* Side Thumbnail */}
+                              {post.image_url && (
+                                <div className="flex-shrink-0">
+                                  <img 
+                                    src={post.image_url} 
+                                    alt="Article thumbnail"
+                                    className="w-32 h-24 sm:w-40 sm:h-28 object-cover rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex gap-4">
+                              <div className="flex-1">
+                                <p className="text-gray-800 leading-relaxed">{post.content}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Engagement Stats */}
+                        <div className="px-4 py-2 text-sm text-indigo-600 bg-gradient-to-r from-indigo-50/50 to-purple-50/50">
+                          <div className="flex items-center space-x-4">
+                            <span className="font-medium">{post.likes} likes</span>
+                            <span className="font-medium">{post.comments.length} comments</span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="px-4 py-3 bg-gradient-to-r from-gray-50/80 to-indigo-50/80">
+                          <div className="flex items-center justify-around">
+                            <button
+                              onClick={() => toggleLike(post.id)}
+                              className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${
+                                post.liked 
+                                  ? 'text-red-600 bg-red-100/80 hover:bg-red-200/80 shadow-md' 
+                                  : 'text-gray-600 hover:bg-indigo-100/80 hover:text-indigo-600'
+                              }`}
+                            >
+                              <Heart className={`w-5 h-5 ${post.liked ? 'fill-current' : ''}`} />
+                              <span className="font-medium">Like</span>
+                            </button>
+                            
+                            <button
+                              onClick={() => toggleComments(post.id)}
+                              className="flex items-center space-x-2 px-4 py-2 rounded-xl text-gray-600 hover:bg-indigo-100/80 hover:text-indigo-600 transition-all duration-200"
+                            >
+                              <MessageSquare className="w-5 h-5" />
+                              <span className="font-medium">Comment</span>
+                            </button>
+                            
+                            <button className="flex items-center space-x-2 px-4 py-2 rounded-xl text-gray-600 hover:bg-indigo-100/80 hover:text-indigo-600 transition-all duration-200">
+                              <Share2 className="w-5 h-5" />
+                              <span className="font-medium">Share</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Comments Section */}
+                        {expandedComments.has(post.id) && (
+                          <div className="px-4 pb-4 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 border-t border-indigo-100">
+                            {/* Add Comment */}
+                            <div className="py-3">
+                              <div className="flex space-x-3">
+                                <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center">
+                                  <User className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                  <input
+                                    type="text"
+                                    placeholder="Write a comment..."
+                                    value={commentInputs[post.id] || ''}
+                                    onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-sm bg-white/70 backdrop-blur-sm"
+                                    onKeyDown={(e) => {
+                                      if (mentionSuggestions && mentionSuggestions.postId === post.id) {
+                                        if (e.key === 'Escape') {
+                                          setMentionSuggestions(null);
+                                          return;
+                                        }
+                                      }
+                                      if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        if (!mentionSuggestions || mentionSuggestions.postId !== post.id) {
+                                          addComment(post.id);
+                                        }
+                                      }
+                                    }}
+                                  />
+                                  {commentInputs[post.id]?.trim() && (
+                                    <button
+                                      onClick={() => addComment(post.id)}
+                                      className="mt-2 px-4 py-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                                    >
+                                      Post
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Existing Comments */}
+                            <div className="space-y-3">
+                              {post.comments.map((comment) => (
+                                <div key={comment.id} className="flex space-x-3">
+                                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-300 to-purple-400 rounded-full flex items-center justify-center">
+                                    <User className="w-4 h-4 text-white" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="bg-white/70 backdrop-blur-sm px-3 py-2 rounded-xl shadow-sm border border-white/50">
+                                      <p className="font-medium text-sm text-indigo-900">{comment.author}</p>
+                                      <p className="text-sm text-gray-700 mt-1">{comment.content}</p>
+                                    </div>
+                                    <p className="text-xs text-indigo-500 mt-1 ml-3">
+                                      {new Date(comment.created_at).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            
+                            {/* Mention Suggestions */}
+                            {mentionSuggestions && mentionSuggestions.postId === post.id && (
+                              <div 
+                                className="absolute z-50 w-64 bg-background border border-border rounded-md shadow-lg mt-1"
+                                style={{
+                                  top: '100%',
+                                  left: 0
+                                }}
+                              >
+                                <Command>
+                                  <CommandList>
+                                    <CommandEmpty>No members found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {mentionSuggestions.suggestions.map((member) => (
+                                        <CommandItem
+                                          key={member.id}
+                                          onSelect={() => handleMentionSelect(post.id, member.email)}
+                                          className="flex items-center gap-2 cursor-pointer"
+                                        >
+                                          <div className="h-6 w-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
+                                            {member.email.charAt(0).toUpperCase()}
+                                          </div>
+                                          <span className="text-sm">{member.email}</span>
+                                          {member.role === 'admin' && (
+                                            <Crown className="h-3 w-3 text-yellow-500 ml-auto" />
+                                          )}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
