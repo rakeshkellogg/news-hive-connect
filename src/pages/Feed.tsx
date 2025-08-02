@@ -946,19 +946,21 @@ const Feed = () => {
                                
                                {settingsForm.automated_news_enabled && (
                                  <>
-                                   <div className="space-y-2">
-                                     <Label htmlFor="news-prompt">News Topic/Field</Label>
-                                     <Input
-                                       id="news-prompt"
-                                       placeholder="e.g., Technology, Healthcare, Sports"
-                                       value={settingsForm.news_prompt}
-                                       onChange={(e) => 
-                                         setSettingsForm(prev => ({
-                                           ...prev,
-                                           news_prompt: e.target.value
-                                         }))
-                                       }
-                                     />
+                                    <div className="space-y-2">
+                                      <Label htmlFor="news-prompt">News Topic/Field</Label>
+                                      <Textarea
+                                        id="news-prompt"
+                                        placeholder="e.g., get top 10 news published in last 24 hrs from technology industry, healthcare innovations, financial markets analysis..."
+                                        value={settingsForm.news_prompt}
+                                        onChange={(e) => 
+                                          setSettingsForm(prev => ({
+                                            ...prev,
+                                            news_prompt: e.target.value
+                                          }))
+                                        }
+                                        className="min-h-[80px] resize-none"
+                                        rows={3}
+                                      />
                                    </div>
                                    
                                    <div className="space-y-3">
