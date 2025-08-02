@@ -273,12 +273,15 @@ const Feed = () => {
             .eq('user_id', user?.id)
             .maybeSingle();
 
+          // Detect if this is an automated post
+          const isAutomatedPost = post.content.includes('🤖 AI News Bot') || post.content.includes('AI News Bot');
+          
           return {
             id: post.id,
             content: post.content,
             author: post.profiles?.email || 'Unknown User',
             created_at: post.created_at,
-            type: 'user' as const,
+            type: isAutomatedPost ? 'automated' as const : 'user' as const,
             likes: likesCount || 0,
             liked: !!userLike,
             comments: (comments || []).map(comment => ({
@@ -1089,21 +1092,39 @@ const Feed = () => {
                     
                     if (isNewsPost) {
                       const lines = post.content.split('\n').filter(line => line.trim());
+                      
+                      // Remove the old link format lines that contain 🔗 or "Powered by AI News Bot"
+                      const cleanedLines = lines.filter(line => 
+                        !line.includes('🔗') && 
+                        !line.includes('Powered by AI News Bot') &&
+                        !line.includes('**[Read Full Article]')
+                      );
+                      
                       // Extract title from the first actual content line (skip bot identifier)
-                      const titleLine = lines.find(line => !line.includes('🤖') && !line.includes('📰') && line.length > 10);
+                      const titleLine = cleanedLines.find(line => 
+                        !line.includes('🤖') && 
+                        !line.includes('📰') && 
+                        !line.includes('AI News Bot') &&
+                        line.length > 10
+                      );
                       postTitle = titleLine || 'News Update';
                       
-                      // Extract summary (content between title and "Read more")
-                      const titleIndex = lines.findIndex(line => line === titleLine);
-                      const readMoreIndex = lines.findIndex(line => line.includes('Read more') || line.includes('http'));
-                      if (titleIndex >= 0 && readMoreIndex > titleIndex) {
-                        postSummary = lines.slice(titleIndex + 1, readMoreIndex).join(' ').trim();
+                      // Extract summary (content between title and URL)
+                      const titleIndex = cleanedLines.findIndex(line => line === titleLine);
+                      const urlLineIndex = cleanedLines.findIndex(line => line.includes('http'));
+                      if (titleIndex >= 0 && urlLineIndex > titleIndex) {
+                        postSummary = cleanedLines.slice(titleIndex + 1, urlLineIndex).join(' ').trim();
+                      } else if (titleIndex >= 0) {
+                        // If no URL found, get content after title
+                        const remainingLines = cleanedLines.slice(titleIndex + 1);
+                        const nonUrlLines = remainingLines.filter(line => !line.includes('http'));
+                        postSummary = nonUrlLines.join(' ').trim();
                       }
                       
-                      // Extract URL
+                      // Extract URL from original content (before cleaning)
                       const urlLine = lines.find(line => line.includes('http'));
                       if (urlLine) {
-                        const urlMatch = urlLine.match(/https?:\/\/[^\s]+/);
+                        const urlMatch = urlLine.match(/https?:\/\/[^\s\)]+/);
                         postUrl = urlMatch ? urlMatch[0] : '';
                       }
                     }
