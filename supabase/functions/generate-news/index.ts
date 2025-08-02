@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -6,6 +7,36 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+async function generateThumbnailImage(title: string, openAIApiKey: string): Promise<string | null> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'dall-e-3',
+        prompt: `Create a professional news thumbnail image representing: ${title}. Style: clean, modern, news-worthy, high contrast, readable text overlay possible`,
+        n: 1,
+        size: '1024x1024',
+        quality: 'standard'
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('OpenAI image generation failed:', await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    return data.data?.[0]?.url || null;
+  } catch (error) {
+    console.error('Error generating thumbnail:', error);
+    return null;
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,6 +50,8 @@ serve(async (req) => {
     );
 
     const perplexityApiKey = Deno.env.get('PERPLEXITY_API_KEY');
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    
     if (!perplexityApiKey) {
       throw new Error('PERPLEXITY_API_KEY is not configured');
     }
@@ -71,11 +104,6 @@ serve(async (req) => {
 
     for (const group of groups || []) {
       try {
-        // For manual generation (via API call), always generate
-        // For automated scheduled generation, check frequency
-        // Since this function can be called both manually and on schedule,
-        // we'll always generate for now (frequency checking can be added to a scheduler)
-
         // Generate news using Perplexity with timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -99,10 +127,10 @@ serve(async (req) => {
                 {
                   role: 'user',
                   content: `Find the ${group.news_count || 10} most recent news articles about: ${group.news_prompt}. For each article, return a JSON object with:
-- title
+- title (make it catchy and engaging, max 80 characters)
 - url (if available)
-- published_date (YYYY-MM-DD)
-- summary (maximum 30 words)
+- published_date (YYYY-MM-DD format)
+- summary (compelling 25-30 word summary that hooks readers)
 
 Return a JSON array of these objects only, without explanation.`
                 }
@@ -164,11 +192,34 @@ Return a JSON array of these objects only, without explanation.`
         }
 
         // Create individual posts for each news article
-        const postsToInsert = newsArticles.slice(0, group.news_count || 10).map(article => ({
-          content: `📰 **${article.title}**\n\n${article.summary}\n\n📅 Published: ${article.published_date}${article.url ? `\n🔗 [Read more](${article.url})` : ''}`,
-          group_id: group.id,
-          user_id: group.created_by // System posts by group creator
-        }));
+        const postsToInsert = [];
+        
+        for (const article of newsArticles.slice(0, group.news_count || 10)) {
+          // Generate thumbnail image if OpenAI key is available
+          let thumbnailUrl = null;
+          if (openAIApiKey) {
+            thumbnailUrl = await generateThumbnailImage(article.title, openAIApiKey);
+          }
+          
+          // Create catchy, well-formatted post content
+          const postContent = `🤖 **AI News Bot** • ${new Date(article.published_date).toLocaleDateString()}
+
+**${article.title}** 
+
+${article.summary}
+
+${article.url ? `🔗 **[Read Full Article](${article.url})**` : ''}
+
+---
+*Powered by AI News Bot*`;
+
+          postsToInsert.push({
+            content: postContent,
+            group_id: group.id,
+            user_id: group.created_by, // System posts by group creator
+            image_url: thumbnailUrl
+          });
+        }
 
         const { error: postError } = await supabaseClient
           .from('posts')
@@ -182,10 +233,10 @@ Return a JSON array of these objects only, without explanation.`
         results.push({
           group: group.name,
           status: 'success',
-          message: `Created ${postsToInsert.length} news posts successfully`
+          message: `Created ${postsToInsert.length} enhanced news posts successfully`
         });
 
-        console.log(`Generated news for group: ${group.name}`);
+        console.log(`Generated enhanced news for group: ${group.name}`);
 
       } catch (error) {
         console.error(`Error processing group ${group.name}:`, error);
@@ -198,7 +249,7 @@ Return a JSON array of these objects only, without explanation.`
     }
 
     return new Response(JSON.stringify({ 
-      message: 'News generation completed', 
+      message: 'Enhanced news generation completed', 
       results 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
