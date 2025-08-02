@@ -32,7 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper, ExternalLink, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -61,6 +61,7 @@ interface Post {
   likes: number;
   liked: boolean;
   comments: Comment[];
+  image_url?: string;
 }
 
 interface Comment {
@@ -1079,59 +1080,132 @@ const Feed = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {posts.map((post) => (
-                    <Card key={post.id} className="overflow-hidden">
-                      <CardContent className="pt-6">
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0">
-                            {post.type === 'automated' ? (
-                              <Bot className="h-8 w-8 text-primary" />
-                            ) : (
-                              <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                                {post.author.charAt(0)}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-semibold">{post.author}</span>
-                              {post.type === 'automated' && (
-                                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                                  AI Generated
-                                </span>
-                              )}
-                              <span className="text-sm text-muted-foreground">
-                                {new Date(post.created_at).toLocaleString()}
-                              </span>
-                              
-                              {/* Admin Delete Button */}
-                              {isGroupAdmin(selectedGroup) && (
-                                <div className="ml-auto">
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Delete Post</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Are you sure you want to delete this post? This action cannot be undone.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => deletePost(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                          Delete
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                  {posts.map((post) => {
+                    // Parse news post content for better formatting
+                    const isNewsPost = post.type === 'automated' && post.content.includes('🤖 AI News Bot');
+                    let postTitle = '';
+                    let postSummary = '';
+                    let postUrl = '';
+                    
+                    if (isNewsPost) {
+                      const lines = post.content.split('\n').filter(line => line.trim());
+                      // Extract title from the first actual content line (skip bot identifier)
+                      const titleLine = lines.find(line => !line.includes('🤖') && !line.includes('📰') && line.length > 10);
+                      postTitle = titleLine || 'News Update';
+                      
+                      // Extract summary (content between title and "Read more")
+                      const titleIndex = lines.findIndex(line => line === titleLine);
+                      const readMoreIndex = lines.findIndex(line => line.includes('Read more') || line.includes('http'));
+                      if (titleIndex >= 0 && readMoreIndex > titleIndex) {
+                        postSummary = lines.slice(titleIndex + 1, readMoreIndex).join(' ').trim();
+                      }
+                      
+                      // Extract URL
+                      const urlLine = lines.find(line => line.includes('http'));
+                      if (urlLine) {
+                        const urlMatch = urlLine.match(/https?:\/\/[^\s]+/);
+                        postUrl = urlMatch ? urlMatch[0] : '';
+                      }
+                    }
+                    
+                    return (
+                      <Card key={post.id} className="overflow-hidden">
+                        <CardContent className="pt-6">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0">
+                              {post.type === 'automated' ? (
+                                <Bot className="h-8 w-8 text-primary" />
+                              ) : (
+                                <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                                  {post.author.charAt(0)}
                                 </div>
                               )}
                             </div>
-                            <p className="text-foreground mb-4">{post.content}</p>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="font-semibold">
+                                  {post.type === 'automated' ? '🤖 AI News Bot' : post.author}
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                  {new Date(post.created_at).toLocaleTimeString('en-US', {
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true
+                                  })} · {new Date(post.created_at).toLocaleDateString('en-US', {
+                                    day: 'numeric',
+                                    month: 'short'
+                                  })}
+                                </span>
+                                
+                                {/* Admin Delete Button */}
+                                {isGroupAdmin(selectedGroup) && (
+                                  <div className="ml-auto">
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Delete Post</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Are you sure you want to delete this post? This action cannot be undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => deletePost(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {isNewsPost ? (
+                                <div className="flex items-start gap-4">
+                                  <div className="flex-1">
+                                    <h3 className="text-lg font-semibold text-foreground mb-3 leading-tight">
+                                      {postTitle}
+                                    </h3>
+                                    {postSummary && (
+                                      <p className="text-muted-foreground mb-4 leading-relaxed">
+                                        {postSummary}
+                                      </p>
+                                    )}
+                                    {postUrl && (
+                                      <a 
+                                        href={postUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Read full article
+                                      </a>
+                                    )}
+                                  </div>
+                                  {post.image_url && (
+                                    <div className="flex-shrink-0 w-24 h-24 bg-muted rounded-lg overflow-hidden">
+                                      <img 
+                                        src={post.image_url} 
+                                        alt="Article thumbnail"
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-foreground mb-4">{post.content}</p>
+                              )}
+                            </div>
+                          </div>
                             
                             {/* Action Buttons */}
                             <div className="flex items-center gap-4 pb-3 border-b">
@@ -1246,11 +1320,10 @@ const Feed = () => {
                                 </div>
                               </div>
                             )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </div>
