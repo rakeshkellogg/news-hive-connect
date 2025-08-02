@@ -130,7 +130,7 @@ serve(async (req) => {
 - title (make it catchy and engaging, max 80 characters)
 - url (if available)
 - published_date (YYYY-MM-DD format)
-- summary (compelling 25-30 word summary that hooks readers)
+- summary (compelling 60 word summary that hooks readers)
 
 Return a JSON array of these objects only, without explanation.`
                 }
