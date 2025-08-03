@@ -198,11 +198,12 @@ For each article you find, return a JSON object with these exact fields:
 - url: complete source URL (REQUIRED - must be the actual article URL)
 - published_date: YYYY-MM-DD format
 - summary: compelling 60-word summary
+- keyword: one word that best represents this article for image search (avoid logos, brands, specific people)
 
 IMPORTANT: Include the actual source URL from where you found each article. Return only a JSON array, no explanation.
 
 Example format:
-[{"title":"Article Title","url":"https://example.com/article","published_date":"2024-01-01","summary":"Article summary here..."}]`
+[{"title":"Article Title","url":"https://example.com/article","published_date":"2024-01-01","summary":"Article summary here...","keyword":"technology"}]`
                 }
               ],
               temperature: 0.1,
@@ -263,16 +264,39 @@ Example format:
         }
 
         // Create individual posts for each news article
-        const postsToInsert = [];
-        
-        for (const article of newsArticles.slice(0, group.news_count || 10)) {
-          // Get relevant photo from Pexels if API key is available
+        const postsToInsert = await Promise.all(newsArticles.slice(0, group.news_count || 10).map(async (article) => {
+          // Get image from Pexels using the keyword from Perplexity
           let thumbnailUrl = null;
-          let keyword = null;
-          if (pexelsApiKey) {
-            const photoResult = await getRelevantPhoto(article.title, pexelsApiKey, perplexityApiKey);
-            thumbnailUrl = photoResult.thumbnailUrl;
-            keyword = photoResult.keyword;
+          const keyword = article.keyword || 'news';
+          
+          if (pexelsApiKey && keyword) {
+            try {
+              console.log(`Searching Pexels for keyword: "${keyword}"`);
+              const pexelsResponse = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=1&orientation=landscape`, {
+                headers: {
+                  'Authorization': pexelsApiKey
+                }
+              });
+              
+              if (pexelsResponse.ok) {
+                const pexelsData = await pexelsResponse.json();
+                if (pexelsData.photos && pexelsData.photos.length > 0) {
+                  thumbnailUrl = pexelsData.photos[0].src.medium;
+                  console.log(`Found image for keyword "${keyword}": ${thumbnailUrl}`);
+                } else {
+                  console.log(`No photos found for keyword "${keyword}"`);
+                }
+              } else {
+                console.error(`Pexels API error for keyword "${keyword}":`, await pexelsResponse.text());
+              }
+            } catch (error) {
+              console.error(`Error fetching image for keyword "${keyword}":`, error);
+            }
+          }
+          
+          // Use fallback image if no Pexels image found
+          if (!thumbnailUrl) {
+            thumbnailUrl = generateFallbackImage();
           }
           
           // Create clean post content without URL
@@ -284,15 +308,15 @@ ${article.summary}
 
 📅 Published: ${new Date(article.published_date).toLocaleDateString()}`;
 
-          postsToInsert.push({
+          return {
             content: postContent,
             url: article.url || null, // Store URL separately for the clickable button
             group_id: group.id,
             user_id: group.created_by, // System posts by group creator
             image_url: thumbnailUrl,
             keyword: keyword
-          });
-        }
+          };
+        }));
 
         const { error: postError } = await supabaseClient
           .from('posts')
