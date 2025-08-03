@@ -251,6 +251,12 @@ Example format:
           if (newsContent.includes('```json')) {
             cleanContent = newsContent.replace(/```json\n?/g, '').replace(/```/g, '').trim();
           }
+          
+          // Fix mixed quote characters that can break JSON parsing
+          cleanContent = cleanContent
+            .replace(/[""]/g, '"')  // Replace smart quotes with regular quotes
+            .replace(/['']/g, "'"); // Replace smart apostrophes with regular ones
+            
           newsArticles = JSON.parse(cleanContent);
         } catch (parseError) {
           console.error(`Failed to parse JSON for group ${group.name}:`, parseError);
