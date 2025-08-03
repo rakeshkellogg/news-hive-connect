@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function getRelevantPhoto(title: string, pexelsApiKey: string, perplexityApiKey: string): Promise<string | null> {
+async function getRelevantPhoto(title: string, pexelsApiKey: string, perplexityApiKey: string): Promise<{keyword: string, thumbnailUrl: string}> {
   try {
     // First, get a one-word visual keyword from Perplexity
     let keyword = 'news';
@@ -55,21 +55,21 @@ async function getRelevantPhoto(title: string, pexelsApiKey: string, perplexityA
 
     if (!response.ok) {
       console.error('Pexels API error:', await response.text());
-      return generateFallbackImage();
+      return { keyword, thumbnailUrl: generateFallbackImage() };
     }
 
     const data = await response.json();
     const photos = data.photos;
     
     if (photos && photos.length > 0) {
-      return photos[0].src.medium;
+      return { keyword, thumbnailUrl: photos[0].src.medium };
     }
     
     // No photos found, return fallback
-    return generateFallbackImage();
+    return { keyword, thumbnailUrl: generateFallbackImage() };
   } catch (error) {
     console.error('Error fetching Pexels photo:', error);
-    return generateFallbackImage();
+    return { keyword: 'news', thumbnailUrl: generateFallbackImage() };
   }
 }
 
@@ -250,8 +250,11 @@ Example format:
         for (const article of newsArticles.slice(0, group.news_count || 10)) {
           // Get relevant photo from Pexels if API key is available
           let thumbnailUrl = null;
+          let keyword = null;
           if (pexelsApiKey) {
-            thumbnailUrl = await getRelevantPhoto(article.title, pexelsApiKey, perplexityApiKey);
+            const photoResult = await getRelevantPhoto(article.title, pexelsApiKey, perplexityApiKey);
+            thumbnailUrl = photoResult.thumbnailUrl;
+            keyword = photoResult.keyword;
           }
           
           // Create clean post content without URL
@@ -268,7 +271,8 @@ ${article.summary}
             url: article.url || null, // Store URL separately for the clickable button
             group_id: group.id,
             user_id: group.created_by, // System posts by group creator
-            image_url: thumbnailUrl
+            image_url: thumbnailUrl,
+            keyword: keyword
           });
         }
 

@@ -180,6 +180,7 @@ export type Database = {
           group_id: string
           id: string
           image_url: string | null
+          keyword: string | null
           updated_at: string
           url: string | null
           user_id: string
@@ -190,6 +191,7 @@ export type Database = {
           group_id: string
           id?: string
           image_url?: string | null
+          keyword?: string | null
           updated_at?: string
           url?: string | null
           user_id: string
@@ -200,6 +202,7 @@ export type Database = {
           group_id?: string
           id?: string
           image_url?: string | null
+          keyword?: string | null
           updated_at?: string
           url?: string | null
           user_id?: string
