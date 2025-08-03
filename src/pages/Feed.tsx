@@ -232,6 +232,7 @@ const Feed = () => {
           id,
           content,
           url,
+          image_url,
           created_at,
           user_id,
           profiles!posts_user_id_fkey (
@@ -282,6 +283,7 @@ const Feed = () => {
             id: post.id,
             content: post.content,
             url: post.url,
+            image_url: post.image_url,
             author: isAutomatedPost ? 'AI News Bot' : (post.profiles?.email || 'Unknown User'),
             created_at: post.created_at,
             type: isAutomatedPost ? 'automated' as const : 'user' as const,
