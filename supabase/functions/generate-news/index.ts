@@ -118,31 +118,37 @@ serve(async (req) => {
             },
             signal: controller.signal,
             body: JSON.stringify({
-              model: 'sonar',
+              model: 'sonar-pro',
               messages: [
                 {
                   role: 'system',
-                  content: 'You are a news curator. Provide concise, informative updates in a professional tone. Focus on recent developments and key insights.'
+                  content: 'You are a news curator. Always include the full source URL for each article. Focus on recent, credible news sources.'
                 },
                 {
                   role: 'user',
-                  content: `Find the ${group.news_count || 10} most recent news articles about: ${group.news_prompt}. For each article, return a JSON object with:
-- title (make it catchy and engaging, max 80 characters)
-- url (if available)
-- published_date (YYYY-MM-DD format)
-- summary (compelling 60 word summary that hooks readers)
+                  content: `Find the ${group.news_count || 10} most recent news articles about: ${group.news_prompt}. 
 
-Return a JSON array of these objects only, without explanation.`
+For each article you find, return a JSON object with these exact fields:
+- title: catchy headline (max 80 chars)
+- url: complete source URL (REQUIRED - must be the actual article URL)
+- published_date: YYYY-MM-DD format
+- summary: compelling 60-word summary
+
+IMPORTANT: Include the actual source URL from where you found each article. Return only a JSON array, no explanation.
+
+Example format:
+[{"title":"Article Title","url":"https://example.com/article","published_date":"2024-01-01","summary":"Article summary here..."}]`
                 }
               ],
-              temperature: 0.2,
+              temperature: 0.1,
               top_p: 0.9,
-              max_tokens: 2000,
+              max_tokens: 3000,
               return_images: false,
               return_related_questions: false,
               search_recency_filter: 'day',
               frequency_penalty: 1,
-              presence_penalty: 0
+              presence_penalty: 0,
+              search_domain_filter: ["reuters.com", "bloomberg.com", "techcrunch.com", "cnn.com", "bbc.com", "wsj.com", "ft.com", "nasdaq.com", "marketwatch.com"]
             })
           });
 
