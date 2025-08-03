@@ -8,32 +8,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function generateThumbnailImage(title: string, openAIApiKey: string): Promise<string | null> {
+async function getRelevantPhoto(title: string, pexelsApiKey: string): Promise<string | null> {
   try {
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
+    // Extract keywords from title for better search
+    const keywords = title
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .split(' ')
+      .filter(word => word.length > 3)
+      .slice(0, 3)
+      .join(' ') || 'news business';
+
+    const response = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(keywords)}&per_page=5&orientation=landscape`, {
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
+        'Authorization': pexelsApiKey,
       },
-      body: JSON.stringify({
-        model: 'dall-e-3',
-        prompt: `Create a professional news thumbnail image representing: ${title}. Style: clean, modern, news-worthy, high contrast, readable text overlay possible`,
-        n: 1,
-        size: '1024x1024',
-        quality: 'standard'
-      }),
     });
 
     if (!response.ok) {
-      console.error('OpenAI image generation failed:', await response.text());
+      console.error('Pexels API error:', await response.text());
       return null;
     }
 
     const data = await response.json();
-    return data.data?.[0]?.url || null;
+    const photos = data.photos;
+    
+    if (photos && photos.length > 0) {
+      // Return medium sized image URL
+      return photos[0].src.medium;
+    }
+    
+    return null;
   } catch (error) {
-    console.error('Error generating thumbnail:', error);
+    console.error('Error fetching Pexels photo:', error);
     return null;
   }
 }
@@ -50,7 +57,7 @@ serve(async (req) => {
     );
 
     const perplexityApiKey = Deno.env.get('PERPLEXITY_API_KEY');
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    const pexelsApiKey = Deno.env.get('PEXELS_API_KEY');
     
     if (!perplexityApiKey) {
       throw new Error('PERPLEXITY_API_KEY is not configured');
@@ -201,10 +208,10 @@ Example format:
         const postsToInsert = [];
         
         for (const article of newsArticles.slice(0, group.news_count || 10)) {
-          // Generate thumbnail image if OpenAI key is available
+          // Get relevant photo from Pexels if API key is available
           let thumbnailUrl = null;
-          if (openAIApiKey) {
-            thumbnailUrl = await generateThumbnailImage(article.title, openAIApiKey);
+          if (pexelsApiKey) {
+            thumbnailUrl = await getRelevantPhoto(article.title, pexelsApiKey);
           }
           
           // Create clean post content without URL
