@@ -13,8 +13,11 @@ async function getRelevantPhoto(title: string, pexelsApiKey: string, perplexityA
     // First, get a one-word visual keyword from Perplexity
     let keyword = 'news';
     
+    console.log(`Processing title: "${title}"`);
+    
     if (perplexityApiKey) {
       try {
+        console.log('Extracting keyword with Perplexity...');
         const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
           method: 'POST',
           headers: {
@@ -26,10 +29,10 @@ async function getRelevantPhoto(title: string, pexelsApiKey: string, perplexityA
             messages: [
               {
                 role: 'user',
-                content: `Generate ONE visual keyword for this news title that would work well for stock photo search. Avoid logos, brands, or specific people. Return only the keyword: "${title}"`
+                content: `Generate ONE unique visual keyword for this news title that would work well for stock photo search. Avoid logos, brands, or specific people. Be creative and specific. Return only the keyword: "${title}"`
               }
             ],
-            temperature: 0.2,
+            temperature: 0.7,
             max_tokens: 10
           }),
         });
@@ -39,14 +42,27 @@ async function getRelevantPhoto(title: string, pexelsApiKey: string, perplexityA
           const extractedKeyword = perplexityData.choices?.[0]?.message?.content?.trim();
           if (extractedKeyword && extractedKeyword.length > 0) {
             keyword = extractedKeyword.replace(/[^\w]/g, '').toLowerCase();
+            console.log(`Extracted keyword: "${keyword}"`);
+          } else {
+            console.log('No keyword extracted from Perplexity response');
           }
+        } else {
+          console.log('Perplexity API error:', await perplexityResponse.text());
         }
       } catch (perplexityError) {
-        console.log('Perplexity keyword extraction failed, using fallback');
+        console.log('Perplexity keyword extraction failed:', perplexityError);
       }
+    } else {
+      console.log('No Perplexity API key available');
     }
 
     // Search Pexels with the keyword
+    console.log(`Searching Pexels for keyword: "${keyword}"`);
+    if (!pexelsApiKey) {
+      console.log('No Pexels API key available, using fallback image');
+      return { keyword, thumbnailUrl: generateFallbackImage() };
+    }
+
     const response = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=5&orientation=landscape`, {
       headers: {
         'Authorization': pexelsApiKey,
@@ -62,10 +78,12 @@ async function getRelevantPhoto(title: string, pexelsApiKey: string, perplexityA
     const photos = data.photos;
     
     if (photos && photos.length > 0) {
+      console.log(`Found ${photos.length} photos for keyword "${keyword}", using: ${photos[0].src.medium}`);
       return { keyword, thumbnailUrl: photos[0].src.medium };
     }
     
     // No photos found, return fallback
+    console.log(`No photos found for keyword "${keyword}", using fallback`);
     return { keyword, thumbnailUrl: generateFallbackImage() };
   } catch (error) {
     console.error('Error fetching Pexels photo:', error);
