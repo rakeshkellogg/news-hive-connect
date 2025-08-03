@@ -611,9 +611,17 @@ const Feed = () => {
   };
 
   const generateNews = async () => {
-    if (!selectedGroup || !selectedGroup.automated_news_enabled) return;
+    if (!selectedGroup || !selectedGroup.automated_news_enabled) {
+      toast({
+        title: "Cannot generate news",
+        description: "Automated news is not enabled for this group",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
+      console.log('Generating news for group:', selectedGroup.id);
       toast({
         title: "Generating news...",
         description: "Please wait while we fetch the latest updates.",
@@ -622,6 +630,8 @@ const Feed = () => {
       const { data, error } = await supabase.functions.invoke('generate-news', {
         body: { groupId: selectedGroup.id }
       });
+
+      console.log('Generate news response:', { data, error });
 
       if (error) throw error;
 
@@ -636,7 +646,7 @@ const Feed = () => {
       console.error('Error generating news:', error);
       toast({
         title: "Error",
-        description: "Failed to generate news. Please try again.",
+        description: `Failed to generate news: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     }
