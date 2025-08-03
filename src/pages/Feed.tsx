@@ -614,14 +614,20 @@ const Feed = () => {
     if (!selectedGroup || !selectedGroup.automated_news_enabled) {
       toast({
         title: "Cannot generate news",
-        description: "Automated news is not enabled for this group",
+        description: "Automated news is not enabled for this group.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      console.log('Generating news for group:', selectedGroup.id);
+      console.log('Starting news generation for group:', selectedGroup.id);
+      console.log('Group settings:', {
+        automated_news_enabled: selectedGroup.automated_news_enabled,
+        news_prompt: selectedGroup.news_prompt,
+        news_count: selectedGroup.news_count
+      });
+
       toast({
         title: "Generating news...",
         description: "Please wait while we fetch the latest updates.",
@@ -633,20 +639,45 @@ const Feed = () => {
 
       console.log('Generate news response:', { data, error });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('No data returned from function');
+      }
+
+      console.log('Function returned data:', data);
 
       // Refresh posts to show the new news
       await fetchPosts(selectedGroup.id);
 
+      const message = data?.results?.[0]?.message || 'news posts';
+      console.log('News generation completed successfully:', message);
+
       toast({
         title: "News generated!",
-        description: `Latest news has been added to the group. Generated ${data?.results?.[0]?.message || 'news posts'}.`,
+        description: `Latest news has been added to the group. ${message}`,
       });
     } catch (error) {
       console.error('Error generating news:', error);
+      
+      let errorMessage = "Failed to generate news. Please try again.";
+      
+      if (error.message) {
+        if (error.message.includes('timeout')) {
+          errorMessage = "Request timed out. Please try again.";
+        } else if (error.message.includes('rate limit')) {
+          errorMessage = "Rate limit exceeded. Please wait a moment and try again.";
+        } else if (error.message.includes('API')) {
+          errorMessage = "API service temporarily unavailable. Please try again.";
+        }
+      }
+      
       toast({
         title: "Error",
-        description: `Failed to generate news: ${error.message || 'Unknown error'}`,
+        description: errorMessage,
         variant: "destructive",
       });
     }

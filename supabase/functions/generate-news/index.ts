@@ -223,6 +223,33 @@ Example format:
           if (!perplexityResponse.ok) {
             const errorText = await perplexityResponse.text();
             console.error(`Perplexity API error for group ${group.name}:`, errorText);
+            console.error(`Response status: ${perplexityResponse.status}`);
+            console.error(`Response headers:`, Object.fromEntries(perplexityResponse.headers.entries()));
+            
+            // Add more specific error handling
+            if (perplexityResponse.status === 429) {
+              console.error('Rate limit exceeded for Perplexity API');
+              results.push({
+                group: group.name,
+                status: 'error',
+                message: 'Rate limit exceeded. Please try again later.'
+              });
+              continue;
+            } else if (perplexityResponse.status === 503) {
+              console.error('Perplexity API service unavailable');
+              results.push({
+                group: group.name,
+                status: 'error',
+                message: 'API service temporarily unavailable.'
+              });
+              continue;
+            }
+            
+            results.push({
+              group: group.name,
+              status: 'error',
+              message: `API error: ${perplexityResponse.status}`
+            });
             continue;
           }
 
