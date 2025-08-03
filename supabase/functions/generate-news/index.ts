@@ -8,18 +8,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function getRelevantPhoto(title: string, pexelsApiKey: string): Promise<string | null> {
+async function getRelevantPhoto(title: string, pexelsApiKey: string, perplexityApiKey: string): Promise<string | null> {
   try {
-    // Extract keywords from title for better search
-    const keywords = title
-      .toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .split(' ')
-      .filter(word => word.length > 3)
-      .slice(0, 3)
-      .join(' ') || 'news business';
+    // First, get a one-word visual keyword from Perplexity
+    let keyword = 'news';
+    
+    if (perplexityApiKey) {
+      try {
+        const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${perplexityApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-sonar-small-128k-online',
+            messages: [
+              {
+                role: 'user',
+                content: `Generate ONE visual keyword for this news title that would work well for stock photo search. Avoid logos, brands, or specific people. Return only the keyword: "${title}"`
+              }
+            ],
+            temperature: 0.2,
+            max_tokens: 10
+          }),
+        });
 
-    const response = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(keywords)}&per_page=5&orientation=landscape`, {
+        if (perplexityResponse.ok) {
+          const perplexityData = await perplexityResponse.json();
+          const extractedKeyword = perplexityData.choices?.[0]?.message?.content?.trim();
+          if (extractedKeyword && extractedKeyword.length > 0) {
+            keyword = extractedKeyword.replace(/[^\w]/g, '').toLowerCase();
+          }
+        }
+      } catch (perplexityError) {
+        console.log('Perplexity keyword extraction failed, using fallback');
+      }
+    }
+
+    // Search Pexels with the keyword
+    const response = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=5&orientation=landscape`, {
       headers: {
         'Authorization': pexelsApiKey,
       },
@@ -27,22 +55,34 @@ async function getRelevantPhoto(title: string, pexelsApiKey: string): Promise<st
 
     if (!response.ok) {
       console.error('Pexels API error:', await response.text());
-      return null;
+      return generateFallbackImage();
     }
 
     const data = await response.json();
     const photos = data.photos;
     
     if (photos && photos.length > 0) {
-      // Return medium sized image URL
       return photos[0].src.medium;
     }
     
-    return null;
+    // No photos found, return fallback
+    return generateFallbackImage();
   } catch (error) {
     console.error('Error fetching Pexels photo:', error);
-    return null;
+    return generateFallbackImage();
   }
+}
+
+function generateFallbackImage(): string {
+  // Generate a simple SVG fallback image
+  const svg = `
+    <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="300" fill="#374151"/>
+      <text x="200" y="150" font-family="Arial, sans-serif" font-size="32" font-weight="bold" text-anchor="middle" fill="#ffffff">NewsBuzz</text>
+    </svg>
+  `;
+  
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
 serve(async (req) => {
@@ -211,7 +251,7 @@ Example format:
           // Get relevant photo from Pexels if API key is available
           let thumbnailUrl = null;
           if (pexelsApiKey) {
-            thumbnailUrl = await getRelevantPhoto(article.title, pexelsApiKey);
+            thumbnailUrl = await getRelevantPhoto(article.title, pexelsApiKey, perplexityApiKey);
           }
           
           // Create clean post content without URL
