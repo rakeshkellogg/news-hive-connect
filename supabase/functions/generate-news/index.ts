@@ -279,16 +279,58 @@ Example format:
             cleanContent = newsContent.replace(/```json\n?/g, '').replace(/```/g, '').trim();
           }
           
-          // Fix mixed quote characters that can break JSON parsing
+          // Enhanced JSON cleaning - handle all types of malformed JSON
           cleanContent = cleanContent
             .replace(/[""]/g, '"')  // Replace smart quotes with regular quotes
-            .replace(/['']/g, "'"); // Replace smart apostrophes with regular ones
+            .replace(/['']/g, "'")  // Replace smart apostrophes
+            .replace(/[\u201C\u201D]/g, '"')  // Unicode left/right double quotes
+            .replace(/[\u2018\u2019]/g, "'")  // Unicode left/right single quotes
+            .replace(/\u2013/g, '-')  // En dash
+            .replace(/\u2014/g, '--')  // Em dash
+            .replace(/\u00A0/g, ' ')  // Non-breaking space
+            .replace(/\t/g, ' ')  // Replace tabs with spaces
+            .replace(/\n\s*\n/g, '\n')  // Remove double newlines
+            .trim();
+
+          // Additional JSON structure fixes
+          cleanContent = cleanContent
+            .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas
+            .replace(/([{,]\s*)(\w+):/g, '$1"$2":')  // Quote unquoted property names
+            .replace(/:\s*'([^']*)'/g, ': "$1"')  // Replace single quotes with double quotes for values
+            .replace(/\\'/g, "'")  // Fix escaped single quotes
+            .replace(/\\"/g, '"')  // Fix double escaped quotes
+            .replace(/"\s*\+\s*"/g, '')  // Remove string concatenation
+            .replace(/,\s*}/g, '}')  // Remove trailing commas before closing braces
+            .replace(/,\s*]/g, ']');  // Remove trailing commas before closing brackets
             
+          console.log('Cleaned content before parsing:', cleanContent);
           newsArticles = JSON.parse(cleanContent);
         } catch (parseError) {
           console.error(`Failed to parse JSON for group ${group.name}:`, parseError);
           console.error(`Content was:`, newsContent);
-          continue;
+          
+          // Try to extract JSON array from the content if it's embedded in text
+          const jsonMatch = newsContent.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            try {
+              let extractedJson = jsonMatch[0]
+                .replace(/[""]/g, '"')
+                .replace(/['']/g, "'")
+                .replace(/,(\s*[}\]])/g, '$1')
+                .replace(/:\s*"([^"]*)"([^,}\]]*)/g, (match, p1, p2) => {
+                  // Fix broken quotes in the middle of strings
+                  return `: "${p1}${p2.replace(/"/g, '\\"')}"`;
+                });
+              
+              newsArticles = JSON.parse(extractedJson);
+              console.log('Successfully parsed JSON from extracted content');
+            } catch (secondParseError) {
+              console.error('Failed to parse extracted JSON:', secondParseError);
+              continue;
+            }
+          } else {
+            continue;
+          }
         }
 
         if (!Array.isArray(newsArticles)) {
