@@ -187,23 +187,39 @@ serve(async (req) => {
               messages: [
                 {
                   role: 'system',
-                  content: 'You are a news curator. Always include the full source URL for each article. Focus on recent, credible news sources.'
+                  content: `You are a professional news curator that MUST return valid JSON only. 
+
+CRITICAL JSON FORMATTING RULES:
+1. Use ONLY standard double quotes (") - never use smart quotes (" " ' ')
+2. Always escape internal quotes with backslash (\")
+3. No trailing commas anywhere
+4. All property names must be in double quotes
+5. Return ONLY the JSON array - no markdown, no explanations, no code blocks
+6. Ensure all URLs are complete and valid`
                 },
                 {
                   role: 'user',
-                  content: `Find the ${group.news_count || 10} most recent news articles about: ${group.news_prompt}. 
+                  content: `Find the ${group.news_count || 10} most recent news articles about: ${group.news_prompt}
 
-For each article you find, return a JSON object with these exact fields:
-- title: catchy headline (max 80 chars)
-- url: complete source URL (REQUIRED - must be the actual article URL)
-- published_date: YYYY-MM-DD format
-- summary: compelling 60-word summary
-- keyword: one word that best represents this article for image search (avoid logos, brands, specific people)
+REQUIRED OUTPUT FORMAT - Return ONLY this exact JSON structure:
+[
+  {
+    "title": "Article Title Here",
+    "url": "https://complete-source-url.com/article-path",
+    "published_date": "2025-01-01",
+    "summary": "Compelling 60-word summary without quotes or special characters",
+    "keyword": "singleword"
+  }
+]
 
-IMPORTANT: Include the actual source URL from where you found each article. Return only a JSON array, no explanation.
+STRICT REQUIREMENTS:
+- title: Maximum 80 characters, no quotes inside
+- url: Complete source URL (REQUIRED - must be actual article URL)  
+- published_date: YYYY-MM-DD format only
+- summary: Exactly 60 words, replace all quotes with apostrophes
+- keyword: Single word for image search (no logos, brands, people names)
 
-Example format:
-[{"title":"Article Title","url":"https://example.com/article","published_date":"2024-01-01","summary":"Article summary here...","keyword":"technology"}]`
+CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, or special characters with standard ones. Return ONLY the JSON array.`
                 }
               ],
               temperature: 0.1,
