@@ -32,11 +32,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper, ExternalLink, UserPlus, Clock, User, Edit } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper, ExternalLink, UserPlus, Clock, User, Edit, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Group {
   id: string;
@@ -105,6 +106,8 @@ const Feed = () => {
     news_count: 10
   });
   const [editingPost, setEditingPost] = useState<{ id: string; content: string } | null>(null);
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [timelineFilter, setTimelineFilter] = useState("all");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -225,10 +228,10 @@ const Feed = () => {
     });
   };
 
-  // Fetch posts for selected group
+  // Fetch posts for selected group with optional filtering
   const fetchPosts = async (groupId: string) => {
     try {
-      const { data: posts, error } = await supabase
+      let query = supabase
         .from('posts')
         .select(`
           id,
@@ -241,8 +244,22 @@ const Feed = () => {
             email
           )
         `)
-        .eq('group_id', groupId)
-        .order('created_at', { ascending: false });
+        .eq('group_id', groupId);
+
+      // Apply search filter if keyword exists
+      if (searchKeyword.trim()) {
+        query = query.ilike('content', `%${searchKeyword.trim()}%`);
+      }
+
+      // Apply timeline filter
+      if (timelineFilter !== "all") {
+        const now = new Date();
+        const monthsAgo = parseInt(timelineFilter);
+        const filterDate = new Date(now.getFullYear(), now.getMonth() - monthsAgo, now.getDate());
+        query = query.gte('created_at', filterDate.toISOString());
+      }
+
+      const { data: posts, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
 
@@ -317,7 +334,7 @@ const Feed = () => {
     if (selectedGroup) {
       fetchPosts(selectedGroup.id);
     }
-  }, [selectedGroup, user?.id]);
+  }, [selectedGroup, user?.id, searchKeyword, timelineFilter]);
 
   const toggleLike = async (postId: string) => {
     try {
@@ -1184,8 +1201,54 @@ const Feed = () => {
 
                {/* Posts Section */}
              <div className="space-y-4">
+               {/* Search and Filter Controls */}
+               <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                 <div className="flex items-center justify-between">
+                   <h3 className="text-xl font-semibold">Latest Updates</h3>
+                 </div>
+                 
+                 <div className="flex gap-3 items-center flex-wrap">
+                   {/* Search Input */}
+                   <div className="relative flex-1 min-w-[200px]">
+                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                     <Input
+                       placeholder="Search posts by keywords..."
+                       value={searchKeyword}
+                       onChange={(e) => setSearchKeyword(e.target.value)}
+                       className="pl-10"
+                     />
+                   </div>
+                   
+                   {/* Timeline Filter */}
+                   <Select value={timelineFilter} onValueChange={setTimelineFilter}>
+                     <SelectTrigger className="w-[160px]">
+                       <SelectValue placeholder="Timeline" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="all">All posts</SelectItem>
+                       <SelectItem value="1">Last month</SelectItem>
+                       <SelectItem value="2">Last 2 months</SelectItem>
+                       <SelectItem value="3">Last 3 months</SelectItem>
+                     </SelectContent>
+                   </Select>
+                   
+                   {/* Clear Filters Button */}
+                   {(searchKeyword || timelineFilter !== "all") && (
+                     <Button 
+                       variant="outline" 
+                       size="sm"
+                       onClick={() => {
+                         setSearchKeyword("");
+                         setTimelineFilter("all");
+                       }}
+                     >
+                       Clear filters
+                     </Button>
+                   )}
+                 </div>
+               </div>
+
                <div className="flex items-center justify-between">
-                 <h3 className="text-xl font-semibold">Latest Updates</h3>
                  <div className="flex gap-2">
                    {/* Generate News Button - Only for admins with automated news enabled */}
                    {isGroupAdmin(selectedGroup) && selectedGroup?.automated_news_enabled && (
