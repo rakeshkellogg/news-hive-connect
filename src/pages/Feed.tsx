@@ -32,7 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper, ExternalLink, UserPlus, Clock, User } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper, ExternalLink, UserPlus, Clock, User, Edit } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,6 +63,7 @@ interface Post {
   comments: Comment[];
   image_url?: string;
   url?: string;
+  user_id?: string; // Add user_id to check post ownership
 }
 
 interface Comment {
@@ -103,6 +104,7 @@ const Feed = () => {
     update_frequency: 1,
     news_count: 10
   });
+  const [editingPost, setEditingPost] = useState<{ id: string; content: string } | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -289,6 +291,7 @@ const Feed = () => {
             type: isAutomatedPost ? 'automated' as const : 'user' as const,
             likes: likesCount || 0,
             liked: !!userLike,
+            user_id: post.user_id, // Include user_id for ownership check
             comments: (comments || []).map(comment => ({
               id: comment.id,
               content: comment.content,
@@ -380,12 +383,28 @@ const Feed = () => {
     return group?.created_by === user?.id;
   };
 
-  const deletePost = (postId: string) => {
-    setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
-    toast({
-      title: "Post deleted",
-      description: "The post has been removed successfully.",
-    });
+  const deletePost = async (postId: string) => {
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId);
+
+      if (error) throw error;
+
+      setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+      toast({
+        title: "Post deleted",
+        description: "The post has been removed successfully.",
+      });
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete post",
+        variant: "destructive",
+      });
+    }
   };
 
   const removeMember = async (memberId: string) => {
@@ -407,6 +426,39 @@ const Feed = () => {
       toast({
         title: "Error",
         description: "Failed to remove member from group.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteGroup = async (groupId: string) => {
+    try {
+      // Delete the group (this will cascade to delete posts, comments, likes, and memberships)
+      const { error } = await supabase
+        .from('groups')
+        .delete()
+        .eq('id', groupId);
+
+      if (error) throw error;
+
+      // Remove the group from user's groups and refresh
+      setGroups(prev => prev.filter(group => group.id !== groupId));
+      
+      // If this was the selected group, clear selection
+      if (selectedGroup?.id === groupId) {
+        setSelectedGroup(null);
+        setPosts([]);
+      }
+
+      toast({
+        title: "Group deleted",
+        description: "The group and all its content have been permanently deleted.",
+      });
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the group.",
         variant: "destructive",
       });
     }
@@ -446,6 +498,38 @@ const Feed = () => {
   };
 
 
+  const editPost = async (postId: string, newContent: string) => {
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .update({ content: newContent.trim() })
+        .eq('id', postId);
+
+      if (error) throw error;
+
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post.id === postId 
+            ? { ...post, content: newContent.trim() }
+            : post
+        )
+      );
+
+      setEditingPost(null);
+      toast({
+        title: "Post updated!",
+        description: "Your post has been updated successfully.",
+      });
+    } catch (error) {
+      console.error('Error updating post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update post",
+        variant: "destructive",
+      });
+    }
+  };
+
   const createPost = async () => {
     if (!newPostContent.trim() || !selectedGroup) return;
 
@@ -478,6 +562,7 @@ const Feed = () => {
         type: 'user',
         likes: 0,
         liked: false,
+        user_id: newPost.user_id,
         comments: []
       };
 
@@ -1062,9 +1147,36 @@ const Feed = () => {
                                </div>
                              </div>
                            </DialogContent>
-                         </Dialog>
-                      </>
-                    )}
+                          </Dialog>
+
+                          {/* Delete Group Button */}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Group
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Group</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to permanently delete "{selectedGroup.name}"? This will delete all posts, comments, and remove all members. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => deleteGroup(selectedGroup.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete Group
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                       </>
+                     )}
                   </div>
                 </div>
               </div>
@@ -1191,34 +1303,47 @@ const Feed = () => {
                                   hour12: true
                                 })}
                               </div>
-                            </div>
-                            
-                            {/* Admin Delete Button */}
-                            {isGroupAdmin(selectedGroup) && (
-                              <div className="ml-auto">
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Post</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to delete this post? This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => deletePost(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            )}
+                             </div>
+                             
+                             {/* Post Actions */}
+                             <div className="ml-auto flex gap-1">
+                               {/* Edit Button - For post author */}
+                               {post.user_id === user?.id && post.type === 'user' && (
+                                 <Button 
+                                   variant="ghost" 
+                                   size="sm" 
+                                   onClick={() => setEditingPost({ id: post.id, content: post.content })}
+                                   className="text-muted-foreground hover:text-foreground"
+                                 >
+                                   <Edit className="h-3 w-3" />
+                                 </Button>
+                               )}
+
+                               {/* Delete Button - For admin or post author */}
+                               {(isGroupAdmin(selectedGroup) || post.user_id === user?.id) && (
+                                 <AlertDialog>
+                                   <AlertDialogTrigger asChild>
+                                     <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                       <Trash2 className="h-3 w-3" />
+                                     </Button>
+                                   </AlertDialogTrigger>
+                                   <AlertDialogContent>
+                                     <AlertDialogHeader>
+                                       <AlertDialogTitle>Delete Post</AlertDialogTitle>
+                                       <AlertDialogDescription>
+                                         Are you sure you want to delete this post? This action cannot be undone.
+                                       </AlertDialogDescription>
+                                     </AlertDialogHeader>
+                                     <AlertDialogFooter>
+                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                       <AlertDialogAction onClick={() => deletePost(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                         Delete
+                                       </AlertDialogAction>
+                                     </AlertDialogFooter>
+                                   </AlertDialogContent>
+                                 </AlertDialog>
+                               )}
+                             </div>
                           </div>
                         </div>
 
@@ -1263,13 +1388,39 @@ const Feed = () => {
                                 </div>
                               )}
                             </div>
-                          ) : (
-                            <div className="flex gap-4">
-                              <div className="flex-1">
-                                <p className="text-gray-800 leading-relaxed">{post.content}</p>
-                              </div>
-                            </div>
-                          )}
+                           ) : (
+                             <div className="flex gap-4">
+                               <div className="flex-1">
+                                 {editingPost && editingPost.id === post.id ? (
+                                   <div className="space-y-2">
+                                     <Textarea
+                                       value={editingPost.content}
+                                       onChange={(e) => setEditingPost({ ...editingPost, content: e.target.value })}
+                                       className="min-h-[80px]"
+                                     />
+                                     <div className="flex gap-2">
+                                       <Button 
+                                         size="sm" 
+                                         onClick={() => editPost(editingPost.id, editingPost.content)}
+                                         disabled={!editingPost.content.trim()}
+                                       >
+                                         Save
+                                       </Button>
+                                       <Button 
+                                         size="sm" 
+                                         variant="outline" 
+                                         onClick={() => setEditingPost(null)}
+                                       >
+                                         Cancel
+                                       </Button>
+                                     </div>
+                                   </div>
+                                 ) : (
+                                   <p className="text-gray-800 leading-relaxed">{post.content}</p>
+                                 )}
+                               </div>
+                             </div>
+                           )}
                         </div>
 
                         {/* Engagement Stats */}
