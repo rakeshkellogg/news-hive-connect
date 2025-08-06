@@ -251,6 +251,36 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_prompts: {
+        Row: {
+          created_at: string
+          created_by: string
+          group_id: string
+          id: string
+          prompt: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          group_id: string
+          id?: string
+          prompt: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          group_id?: string
+          id?: string
+          prompt?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

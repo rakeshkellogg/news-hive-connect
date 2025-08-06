@@ -38,6 +38,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SavedPrompts } from "@/components/SavedPrompts";
 
 interface Group {
   id: string;
@@ -1091,22 +1092,35 @@ const Feed = () => {
                                
                                {settingsForm.automated_news_enabled && (
                                  <>
-                                    <div className="space-y-2">
-                                      <Label htmlFor="news-prompt">News Topic/Field</Label>
-                                      <Textarea
-                                        id="news-prompt"
-                                        placeholder="e.g., get top 10 news published in last 24 hrs from technology industry, healthcare innovations, financial markets analysis..."
-                                        value={settingsForm.news_prompt}
-                                        onChange={(e) => 
-                                          setSettingsForm(prev => ({
-                                            ...prev,
-                                            news_prompt: e.target.value
-                                          }))
-                                        }
-                                        className="min-h-[80px] resize-none"
-                                        rows={3}
-                                      />
-                                   </div>
+                                     <div className="space-y-2">
+                                       <div className="flex items-center justify-between">
+                                         <Label htmlFor="news-prompt">News Topic/Field</Label>
+                                         <SavedPrompts
+                                           groupId={selectedGroup.id}
+                                           currentPrompt={settingsForm.news_prompt}
+                                           onPromptSelect={(prompt) => 
+                                             setSettingsForm(prev => ({
+                                               ...prev,
+                                               news_prompt: prompt
+                                             }))
+                                           }
+                                           isAdmin={isGroupAdmin(selectedGroup)}
+                                         />
+                                       </div>
+                                       <Textarea
+                                         id="news-prompt"
+                                         placeholder="e.g., get top 10 news published in last 24 hrs from technology industry, healthcare innovations, financial markets analysis..."
+                                         value={settingsForm.news_prompt}
+                                         onChange={(e) => 
+                                           setSettingsForm(prev => ({
+                                             ...prev,
+                                             news_prompt: e.target.value
+                                           }))
+                                         }
+                                         className="min-h-[80px] resize-none"
+                                         rows={3}
+                                       />
+                                    </div>
                                    
                                    <div className="space-y-3">
                                      <Label>Update Frequency</Label>
