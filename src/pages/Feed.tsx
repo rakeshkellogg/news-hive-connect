@@ -101,6 +101,7 @@ const Feed = () => {
   const [mentionSuggestions, setMentionSuggestions] = useState<{ postId: string; suggestions: GroupMember[]; position: { top: number; left: number } } | null>(null);
   const [showGroupSettings, setShowGroupSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState({
+    name: '',
     automated_news_enabled: false,
     news_prompt: '',
     update_frequency: 1,
@@ -153,6 +154,7 @@ const Feed = () => {
         fetchGroupMembers(userGroups[0].id);
         // Initialize settings form with group data
         setSettingsForm({
+          name: userGroups[0].name || '',
           automated_news_enabled: userGroups[0].automated_news_enabled || false,
           news_prompt: userGroups[0].news_prompt || '',
           update_frequency: userGroups[0].update_frequency || 1,
@@ -667,6 +669,7 @@ const Feed = () => {
       const { error } = await supabase
         .from('groups')
         .update({
+          name: settingsForm.name,
           automated_news_enabled: settingsForm.automated_news_enabled,
           news_prompt: settingsForm.news_prompt,
           update_frequency: settingsForm.update_frequency,
@@ -679,6 +682,7 @@ const Feed = () => {
       // Update the selected group in state
       setSelectedGroup(prev => prev ? {
         ...prev,
+        name: settingsForm.name,
         automated_news_enabled: settingsForm.automated_news_enabled,
         news_prompt: settingsForm.news_prompt,
         update_frequency: settingsForm.update_frequency,
@@ -690,6 +694,7 @@ const Feed = () => {
         group.id === selectedGroup.id 
           ? {
               ...group,
+              name: settingsForm.name,
               automated_news_enabled: settingsForm.automated_news_enabled,
               news_prompt: settingsForm.news_prompt,
               update_frequency: settingsForm.update_frequency,
@@ -877,12 +882,13 @@ const Feed = () => {
                          setSelectedGroup(group);
                          fetchGroupMembers(group.id);
                          // Update settings form when group changes
-                          setSettingsForm({
-                            automated_news_enabled: group.automated_news_enabled || false,
-                            news_prompt: group.news_prompt || '',
-                            update_frequency: group.update_frequency || 1,
-                            news_count: group.news_count || 10
-                          });
+                           setSettingsForm({
+                             name: group.name || '',
+                             automated_news_enabled: group.automated_news_enabled || false,
+                             news_prompt: group.news_prompt || '',
+                             update_frequency: group.update_frequency || 1,
+                             news_count: group.news_count || 10
+                           });
                        }}
                      >
                       {group.name}
@@ -1075,20 +1081,35 @@ const Feed = () => {
                                  Configure automated news settings for {selectedGroup.name}
                                </DialogDescription>
                              </DialogHeader>
-                             <div className="space-y-4">
-                               <div className="flex items-center space-x-2">
-                                 <Checkbox 
-                                   id="automated-news"
-                                   checked={settingsForm.automated_news_enabled}
-                                   onCheckedChange={(checked) => 
-                                     setSettingsForm(prev => ({
-                                       ...prev,
-                                       automated_news_enabled: checked as boolean
-                                     }))
-                                   }
-                                 />
-                                 <Label htmlFor="automated-news">Enable Automated News</Label>
-                               </div>
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="group-name">Group Name</Label>
+                                  <Input
+                                    id="group-name"
+                                    value={settingsForm.name}
+                                    onChange={(e) => 
+                                      setSettingsForm(prev => ({
+                                        ...prev,
+                                        name: e.target.value
+                                      }))
+                                    }
+                                    placeholder="Enter group name"
+                                  />
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox 
+                                    id="automated-news"
+                                    checked={settingsForm.automated_news_enabled}
+                                    onCheckedChange={(checked) => 
+                                      setSettingsForm(prev => ({
+                                        ...prev,
+                                        automated_news_enabled: checked as boolean
+                                      }))
+                                    }
+                                  />
+                                  <Label htmlFor="automated-news">Enable Automated News</Label>
+                                </div>
                                
                                {settingsForm.automated_news_enabled && (
                                  <>
