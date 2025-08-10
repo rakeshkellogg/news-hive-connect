@@ -40,6 +40,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SavedPrompts } from "@/components/SavedPrompts";
 import { GroupStats } from "@/components/GroupStats";
+import { SuperAdminToolbar } from "@/components/SuperAdminToolbar";
 
 interface Group {
   id: string;
@@ -914,6 +915,7 @@ const Feed = () => {
       </header>
 
       <main className="container py-8">
+        <SuperAdminToolbar />
         {groups.length === 0 ? (
           <div className="text-center py-12">
             <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
