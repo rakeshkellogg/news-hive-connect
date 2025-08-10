@@ -415,6 +415,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_platform_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_groups: number
+          total_posts: number
+          total_comments: number
+          flagged_posts: number
+          flagged_comments: number
+        }[]
+      }
+      get_user_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_users: number
+          active_users_24h: number
+          suspended_users: number
+          super_admins: number
+        }[]
+      }
       has_role: {
         Args: {
           _user_id: string
