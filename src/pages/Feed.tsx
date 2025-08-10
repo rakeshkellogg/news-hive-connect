@@ -1198,18 +1198,6 @@ const Feed = () => {
                                          <RadioGroupItem value="3" id="freq-3" />
                                          <Label htmlFor="freq-3">Every 3 days</Label>
                                        </div>
-                                       <div className="flex items-center space-x-2">
-                                         <RadioGroupItem value="7" id="freq-7" />
-                                         <Label htmlFor="freq-7">Weekly</Label>
-                                       </div>
-                                       <div className="flex items-center space-x-2">
-                                         <RadioGroupItem value="14" id="freq-14" />
-                                         <Label htmlFor="freq-14">Bi-weekly</Label>
-                                       </div>
-                                       <div className="flex items-center space-x-2">
-                                         <RadioGroupItem value="30" id="freq-30" />
-                                         <Label htmlFor="freq-30">Monthly</Label>
-                                       </div>
                                      </RadioGroup>
                                      <div className="text-xs text-muted-foreground">
                                        News will be automatically generated based on this frequency. You can also manually generate news anytime.
