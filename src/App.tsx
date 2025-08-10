@@ -9,6 +9,10 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
 import CreateGroup from "./pages/CreateGroup";
+import AdminOverview from "./pages/admin/AdminOverview";
+import AdminModeration from "./pages/admin/AdminModeration";
+import AdminRoles from "./pages/admin/AdminRoles";
+import AdminAudit from "./pages/admin/AdminAudit";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +29,10 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/create-group" element={<CreateGroup />} />
+            <Route path="/admin" element={<AdminOverview />} />
+            <Route path="/admin/moderation" element={<AdminModeration />} />
+            <Route path="/admin/roles" element={<AdminRoles />} />
+            <Route path="/admin/audit" element={<AdminAudit />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
