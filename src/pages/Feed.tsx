@@ -32,7 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper, ExternalLink, UserPlus, Clock, User, Edit, Search } from "lucide-react";
+import { Plus, Users, LogOut, ChevronDown, MessageSquare, Bot, Heart, Send, Settings, Trash2, UserMinus, Crown, Share2, Copy, Newspaper, ExternalLink, UserPlus, Clock, User, Edit, Search, Flag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -386,6 +386,28 @@ const Feed = () => {
         description: "Failed to update like",
         variant: "destructive",
       });
+    }
+  };
+
+  const flagPost = async (postId: string, reason: string = 'Inappropriate content') => {
+    try {
+      const { error } = await supabase
+        .from('post_flags')
+        .insert({ post_id: postId, user_id: user?.id, reason });
+
+      if (error) {
+        // Unique violation means already flagged by this user
+        if ((error as any).code === '23505') {
+          toast({ title: 'Already flagged', description: 'You have already flagged this post.' });
+          return;
+        }
+        throw error;
+      }
+
+      toast({ title: 'Post flagged', description: 'Thanks. A moderator will review it.' });
+    } catch (error) {
+      console.error('Error flagging post:', error);
+      toast({ title: 'Error', description: 'Failed to flag post', variant: 'destructive' });
     }
   };
 
@@ -1569,6 +1591,14 @@ const Feed = () => {
                             <button className="flex items-center space-x-2 px-4 py-2 rounded-xl text-gray-600 hover:bg-indigo-100/80 hover:text-indigo-600 transition-all duration-200">
                               <Share2 className="w-5 h-5" />
                               <span className="font-medium">Share</span>
+                            </button>
+
+                            <button
+                              onClick={() => flagPost(post.id)}
+                              className="flex items-center space-x-2 px-4 py-2 rounded-xl text-gray-600 hover:bg-red-100/80 hover:text-red-600 transition-all duration-200"
+                            >
+                              <Flag className="w-5 h-5" />
+                              <span className="font-medium">Flag</span>
                             </button>
                           </div>
                         </div>

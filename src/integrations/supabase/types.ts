@@ -50,6 +50,30 @@ export type Database = {
         }
         Relationships: []
       }
+      comment_flags: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           content: string
@@ -212,6 +236,30 @@ export type Database = {
           },
         ]
       }
+      post_flags: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       posts: {
         Row: {
           content: string
@@ -268,6 +316,10 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          is_suspended: boolean
+          suspended_by: string | null
+          suspended_reason: string | null
+          suspended_until: string | null
           updated_at: string
           user_id: string
           username: string | null
@@ -276,6 +328,10 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_suspended?: boolean
+          suspended_by?: string | null
+          suspended_reason?: string | null
+          suspended_until?: string | null
           updated_at?: string
           user_id: string
           username?: string | null
@@ -284,6 +340,10 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_suspended?: boolean
+          suspended_by?: string | null
+          suspended_reason?: string | null
+          suspended_until?: string | null
           updated_at?: string
           user_id?: string
           username?: string | null
