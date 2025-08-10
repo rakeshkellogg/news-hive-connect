@@ -39,6 +39,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SavedPrompts } from "@/components/SavedPrompts";
+import { GroupStats } from "@/components/GroupStats";
 
 interface Group {
   id: string;
@@ -1334,6 +1335,17 @@ const Feed = () => {
                  </div>
                </div>
               
+              {/* Minimalistic Group Stats */}/
+              {selectedGroup && (
+                <div className="mt-4">
+                  <GroupStats 
+                    groupId={selectedGroup.id}
+                    isAdmin={isGroupAdmin(selectedGroup)}
+                    onViewMembers={() => setShowMembersDialog(true)}
+                  />
+                </div>
+              )}
+
               {posts.length === 0 ? (
                 <div className="text-center py-8">
                   <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
