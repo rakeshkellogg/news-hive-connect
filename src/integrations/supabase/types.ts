@@ -103,6 +103,7 @@ export type Database = {
           description: string | null
           id: string
           invite_code: string
+          last_news_run_at: string | null
           name: string
           news_count: number
           news_prompt: string | null
@@ -116,6 +117,7 @@ export type Database = {
           description?: string | null
           id?: string
           invite_code?: string
+          last_news_run_at?: string | null
           name: string
           news_count?: number
           news_prompt?: string | null
@@ -129,6 +131,7 @@ export type Database = {
           description?: string | null
           id?: string
           invite_code?: string
+          last_news_run_at?: string | null
           name?: string
           news_count?: number
           news_prompt?: string | null

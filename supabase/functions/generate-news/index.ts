@@ -169,6 +169,20 @@ serve(async (req) => {
 
     for (const group of groups || []) {
       try {
+        // Frequency gating based on group settings (days)
+        const freqDays = group.update_frequency || 1;
+        const lastRun = group.last_news_run_at ? new Date(group.last_news_run_at) : null;
+        const now = new Date();
+        const due = !lastRun || (now.getTime() - lastRun.getTime()) >= freqDays * 24 * 60 * 60 * 1000;
+
+        if (!due) {
+          const msLeft = lastRun ? (freqDays * 24 * 60 * 60 * 1000 - (now.getTime() - lastRun.getTime())) : 0;
+          const hrsLeft = lastRun ? Math.max(0, Math.ceil(msLeft / (60 * 60 * 1000))) : 0;
+          console.log(`Skipping ${group.name} - not due yet. Hours left: ${hrsLeft}`);
+          results.push({ group: group.name, status: 'skipped', message: `Not due yet. Next in ~${hrsLeft}h` });
+          continue;
+        }
+
         // Generate news using Perplexity with timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -416,6 +430,16 @@ ${article.summary}
         if (postError) {
           console.error(`Error creating posts for group ${group.name}:`, postError);
           throw postError;
+        }
+
+        // Update last run timestamp so frequency gating works
+        const { error: updateGroupError } = await supabaseClient
+          .from('groups')
+          .update({ last_news_run_at: new Date().toISOString() })
+          .eq('id', group.id);
+
+        if (updateGroupError) {
+          console.error('Failed to update last_news_run_at for group', group.id, updateGroupError);
         }
 
         results.push({
