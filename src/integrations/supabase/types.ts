@@ -163,9 +163,12 @@ export type Database = {
           description: string | null
           id: string
           invite_code: string
+          last_generation_error: string | null
+          last_news_generation: string | null
           last_news_run_at: string | null
           name: string
           news_count: number
+          news_generation_status: string | null
           news_prompt: string | null
           update_frequency: number | null
           updated_at: string
@@ -177,9 +180,12 @@ export type Database = {
           description?: string | null
           id?: string
           invite_code?: string
+          last_generation_error?: string | null
+          last_news_generation?: string | null
           last_news_run_at?: string | null
           name: string
           news_count?: number
+          news_generation_status?: string | null
           news_prompt?: string | null
           update_frequency?: number | null
           updated_at?: string
@@ -191,9 +197,12 @@ export type Database = {
           description?: string | null
           id?: string
           invite_code?: string
+          last_generation_error?: string | null
+          last_news_generation?: string | null
           last_news_run_at?: string | null
           name?: string
           news_count?: number
+          news_generation_status?: string | null
           news_prompt?: string | null
           update_frequency?: number | null
           updated_at?: string
