@@ -1,1 +1,4 @@
 project_id = "vmzzhwwpmguoymogrvcn"
+
+[functions.scheduled-news]
+verify_jwt = false

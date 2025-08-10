@@ -41,7 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SavedPrompts } from "@/components/SavedPrompts";
 import { GroupStats } from "@/components/GroupStats";
 import { SuperAdminToolbar } from "@/components/SuperAdminToolbar";
-
+import { Badge } from "@/components/ui/badge";
 interface Group {
   id: string;
   name: string;
@@ -54,6 +54,9 @@ interface Group {
   news_prompt?: string;
   update_frequency?: number;
   news_count?: number;
+  last_news_generation?: string;
+  news_generation_status?: string;
+  last_generation_error?: string;
 }
 
 interface Post {
@@ -140,7 +143,10 @@ const Feed = () => {
             automated_news_enabled,
             news_prompt,
             update_frequency,
-            news_count
+            news_count,
+            last_news_generation,
+            news_generation_status,
+            last_generation_error
           )
         `)
         .eq('user_id', user?.id);
@@ -782,8 +788,9 @@ const Feed = () => {
 
       console.log('Function returned data:', data);
 
-      // Refresh posts to show the new news
+      // Refresh posts and groups to show the new news and updated status
       await fetchPosts(selectedGroup.id);
+      await fetchUserGroups();
 
       const message = data?.results?.[0]?.message || 'news posts';
       console.log('News generation completed successfully:', message);
@@ -1191,26 +1198,63 @@ const Feed = () => {
                                          <RadioGroupItem value="3" id="freq-3" />
                                          <Label htmlFor="freq-3">Every 3 days</Label>
                                        </div>
+                                       <div className="flex items-center space-x-2">
+                                         <RadioGroupItem value="7" id="freq-7" />
+                                         <Label htmlFor="freq-7">Weekly</Label>
+                                       </div>
+                                       <div className="flex items-center space-x-2">
+                                         <RadioGroupItem value="14" id="freq-14" />
+                                         <Label htmlFor="freq-14">Bi-weekly</Label>
+                                       </div>
+                                       <div className="flex items-center space-x-2">
+                                         <RadioGroupItem value="30" id="freq-30" />
+                                         <Label htmlFor="freq-30">Monthly</Label>
+                                       </div>
                                      </RadioGroup>
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                      <Label htmlFor="news-count">Number of News Articles</Label>
-                                      <Input
-                                        id="news-count"
-                                        type="number"
-                                        min="1"
-                                        max="20"
-                                        placeholder="10"
-                                        value={settingsForm.news_count}
-                                        onChange={(e) => 
-                                          setSettingsForm(prev => ({
-                                            ...prev,
-                                            news_count: parseInt(e.target.value) || 10
-                                          }))
-                                        }
-                                      />
-                                    </div>
+                                     <div className="text-xs text-muted-foreground">
+                                       News will be automatically generated based on this frequency. You can also manually generate news anytime.
+                                     </div>
+                                   </div>
+
+                                   <div className="space-y-2">
+                                     <Label>News Generation Status</Label>
+                                     <div className="text-sm text-muted-foreground">
+                                       <div className="flex items-center gap-2">
+                                         <span>
+                                           Frequency: Every {settingsForm.update_frequency} day{settingsForm.update_frequency !== 1 ? 's' : ''}
+                                         </span>
+                                         <Badge variant={(selectedGroup.news_generation_status === 'running') ? 'secondary' : (selectedGroup.news_generation_status === 'failed') ? 'destructive' : (selectedGroup.news_generation_status === 'completed') ? 'default' : 'outline'}>
+                                           {selectedGroup.news_generation_status || 'idle'}
+                                         </Badge>
+                                       </div>
+                                       <div>
+                                         Next generation: {selectedGroup.last_news_generation ? new Date(new Date(selectedGroup.last_news_generation).getTime() + (settingsForm.update_frequency || 1) * 24 * 60 * 60 * 1000).toLocaleDateString() : 'Not generated yet'}
+                                       </div>
+                                       {selectedGroup.last_generation_error && (
+                                         <div className="text-destructive text-xs">
+                                           Last error: {selectedGroup.last_generation_error}
+                                         </div>
+                                       )}
+                                     </div>
+                                   </div>
+
+                                   <div className="space-y-2">
+                                     <Label htmlFor="news-count">Number of News Articles</Label>
+                                     <Input
+                                       id="news-count"
+                                       type="number"
+                                       min="1"
+                                       max="20"
+                                       placeholder="10"
+                                       value={settingsForm.news_count}
+                                       onChange={(e) => 
+                                         setSettingsForm(prev => ({
+                                           ...prev,
+                                           news_count: parseInt(e.target.value) || 10
+                                         }))
+                                       }
+                                     />
+                                   </div>
                                   </>
                                 )}
                                

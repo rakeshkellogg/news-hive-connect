@@ -169,19 +169,43 @@ serve(async (req) => {
 
     for (const group of groups || []) {
       try {
-        // Frequency gating based on group settings (days)
-        const freqDays = group.update_frequency || 1;
-        const lastRun = group.last_news_run_at ? new Date(group.last_news_run_at) : null;
-        const now = new Date();
-        const due = !lastRun || (now.getTime() - lastRun.getTime()) >= freqDays * 24 * 60 * 60 * 1000;
+        console.log(`Processing group: ${group.name} (${group.id})`);
+        console.log(`Group settings:`, {
+          automated_news_enabled: group.automated_news_enabled,
+          update_frequency: group.update_frequency,
+          last_news_generation: group.last_news_generation,
+          news_prompt: group.news_prompt,
+          news_count: group.news_count
+        });
 
-        if (!due) {
-          const msLeft = lastRun ? (freqDays * 24 * 60 * 60 * 1000 - (now.getTime() - lastRun.getTime())) : 0;
-          const hrsLeft = lastRun ? Math.max(0, Math.ceil(msLeft / (60 * 60 * 1000))) : 0;
-          console.log(`Skipping ${group.name} - not due yet. Hours left: ${hrsLeft}`);
-          results.push({ group: group.name, status: 'skipped', message: `Not due yet. Next in ~${hrsLeft}h` });
+        // Check frequency using last_news_generation
+        let shouldGenerate = true;
+        if (group.last_news_generation) {
+          const lastGeneration = new Date(group.last_news_generation);
+          const now = new Date();
+          const daysSince = Math.floor((now.getTime() - lastGeneration.getTime()) / (1000 * 60 * 60 * 24));
+          const required = group.update_frequency || 1;
+          console.log(`Days since last generation for ${group.name}: ${daysSince}`);
+          console.log(`Required frequency: ${required} days`);
+          shouldGenerate = daysSince >= required;
+        } else {
+          console.log(`No previous generation for group ${group.name}, generating now`);
+        }
+
+        if (!shouldGenerate) {
+          results.push({
+            group: group.name,
+            status: 'skipped',
+            message: `Frequency not met (${group.update_frequency || 1} days)`
+          });
           continue;
         }
+
+        // Update status to running
+        await supabaseClient
+          .from('groups')
+          .update({ news_generation_status: 'running' })
+          .eq('id', group.id);
 
         // Generate news using Perplexity with timeout
         const controller = new AbortController();
@@ -259,6 +283,10 @@ CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, o
             // Add more specific error handling
             if (perplexityResponse.status === 429) {
               console.error('Rate limit exceeded for Perplexity API');
+              await supabaseClient
+                .from('groups')
+                .update({ news_generation_status: 'failed', last_generation_error: 'Rate limit exceeded. Please try again later.' })
+                .eq('id', group.id);
               results.push({
                 group: group.name,
                 status: 'error',
@@ -267,6 +295,10 @@ CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, o
               continue;
             } else if (perplexityResponse.status === 503) {
               console.error('Perplexity API service unavailable');
+              await supabaseClient
+                .from('groups')
+                .update({ news_generation_status: 'failed', last_generation_error: 'API service temporarily unavailable.' })
+                .eq('id', group.id);
               results.push({
                 group: group.name,
                 status: 'error',
@@ -275,6 +307,10 @@ CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, o
               continue;
             }
             
+            await supabaseClient
+              .from('groups')
+              .update({ news_generation_status: 'failed', last_generation_error: `API error: ${perplexityResponse.status}` })
+              .eq('id', group.id);
             results.push({
               group: group.name,
               status: 'error',
@@ -293,10 +329,23 @@ CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, o
 
         } catch (fetchError) {
           clearTimeout(timeoutId);
-          if (fetchError.name === 'AbortError') {
+          if ((fetchError as any).name === 'AbortError') {
             console.error(`Timeout error for group ${group.name}`);
+            await supabaseClient
+              .from('groups')
+              .update({ news_generation_status: 'failed', last_generation_error: 'Request timed out' })
+              .eq('id', group.id);
+            results.push({
+              group: group.name,
+              status: 'error',
+              message: 'Request timed out'
+            });
             continue;
           }
+          await supabaseClient
+            .from('groups')
+            .update({ news_generation_status: 'failed', last_generation_error: (fetchError as any).message || 'Network error' })
+            .eq('id', group.id);
           throw fetchError;
         }
 
@@ -432,14 +481,18 @@ ${article.summary}
           throw postError;
         }
 
-        // Update last run timestamp so frequency gating works
+        // Update last generation timestamp and status
         const { error: updateGroupError } = await supabaseClient
           .from('groups')
-          .update({ last_news_run_at: new Date().toISOString() })
+          .update({ 
+            last_news_generation: new Date().toISOString(),
+            news_generation_status: 'completed',
+            last_generation_error: null
+          })
           .eq('id', group.id);
 
         if (updateGroupError) {
-          console.error('Failed to update last_news_run_at for group', group.id, updateGroupError);
+          console.error('Failed to update generation status for group', group.id, updateGroupError);
         }
 
         results.push({
@@ -452,10 +505,14 @@ ${article.summary}
 
       } catch (error) {
         console.error(`Error processing group ${group.name}:`, error);
+        await supabaseClient
+          .from('groups')
+          .update({ news_generation_status: 'failed', last_generation_error: (error as any).message || 'Unknown error' })
+          .eq('id', group.id);
         results.push({
           group: group.name,
           status: 'error',
-          message: error.message
+          message: (error as any).message || 'Unknown error'
         });
       }
     }
