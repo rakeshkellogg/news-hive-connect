@@ -20,12 +20,50 @@ export const AuthForm = ({ isSignUp, onToggle }: AuthFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Leaked password protection via HaveIBeenPwned (k-anonymity API)
+  const sha1Hex = async (str: string) => {
+    const enc = new TextEncoder();
+    const data = enc.encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  };
+
+  const checkPwned = async (password: string): Promise<number> => {
+    try {
+      const hash = await sha1Hex(password);
+      const prefix = hash.slice(0, 5);
+      const suffix = hash.slice(5);
+      const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+      const text = await res.text();
+      const match = text.split('\n').find(line => line.startsWith(suffix));
+      if (!match) return 0;
+      const count = parseInt(match.split(':')[1].trim(), 10);
+      return isNaN(count) ? 0 : count;
+    } catch {
+      // If the API fails, don't block signup; just allow it to proceed
+      return 0;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       if (isSignUp) {
+        // Prevent weak/leaked passwords
+        const pwnedCount = await checkPwned(password);
+        if (pwnedCount > 0) {
+          toast({
+            title: "Choose a stronger password",
+            description: "This password appears in known breaches. Please use a unique, strong password.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,

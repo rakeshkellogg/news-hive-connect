@@ -35,6 +35,21 @@ const Auth = () => {
     }
   }, [searchParams, toast]);
 
+  // Surface auth/OTP errors from callback URL (e.g., expired verification links)
+  useEffect(() => {
+    const error = searchParams.get("error") || searchParams.get("error_description");
+    if (error) {
+      const isExpired = /expired|token/i.test(error);
+      toast({
+        title: isExpired ? "Verification link expired" : "Authentication error",
+        description: isExpired
+          ? "Please sign in again to receive a new verification email."
+          : error,
+        variant: "destructive",
+      });
+    }
+  }, [searchParams, toast]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
