@@ -83,7 +83,7 @@ interface Comment {
 interface GroupMember {
   id: string;
   user_id: string;
-  email: string;
+  name: string;
   role: 'admin' | 'member';
   joined_at: string;
 }
@@ -191,24 +191,20 @@ const Feed = () => {
 
       if (membershipError) throw membershipError;
 
-      // Then get user profiles for each membership
-      const members: GroupMember[] = [];
-      
-      for (const membership of memberships || []) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('user_id', membership.user_id)
-          .maybeSingle();
+// Then get public usernames via RPC to avoid exposing emails
+      const memberIds = (memberships || []).map(m => m.user_id);
+      const { data: publicProfiles, error: profilesError } = await (supabase as any).rpc('get_public_profiles', { ids: memberIds });
+      if (profilesError) throw profilesError;
+      const profilesArray = (publicProfiles || []) as { user_id: string; username: string }[];
+      const nameMap = new Map(profilesArray.map(p => [p.user_id, p.username]));
 
-        members.push({
-          id: membership.id,
-          user_id: membership.user_id,
-          email: profile?.email || 'Unknown User',
-          role: membership.role as 'admin' | 'member',
-          joined_at: membership.joined_at
-        });
-      }
+      const members: GroupMember[] = (memberships || []).map(membership => ({
+        id: membership.id,
+        user_id: membership.user_id,
+        name: nameMap.get(membership.user_id) || 'Member',
+        role: membership.role as 'admin' | 'member',
+        joined_at: membership.joined_at
+      }));
 
       setGroupMembers(members);
     } catch (error) {
@@ -252,7 +248,7 @@ const Feed = () => {
           created_at,
           user_id,
           profiles!posts_user_id_fkey (
-            email
+            username
           )
         `)
         .eq('group_id', groupId);
@@ -286,7 +282,7 @@ const Feed = () => {
               created_at,
               user_id,
               profiles!comments_user_id_fkey (
-                email
+                username
               )
             `)
             .eq('post_id', post.id)
@@ -314,7 +310,7 @@ const Feed = () => {
             content: post.content,
             url: post.url,
             image_url: post.image_url,
-            author: isAutomatedPost ? 'AI News Bot' : (post.profiles?.email || 'Unknown User'),
+            author: isAutomatedPost ? 'AI News Bot' : (post.profiles?.username || 'Member'),
             created_at: post.created_at,
             type: isAutomatedPost ? 'automated' as const : 'user' as const,
             likes: likesCount || 0,
@@ -323,7 +319,7 @@ const Feed = () => {
             comments: (comments || []).map(comment => ({
               id: comment.id,
               content: comment.content,
-              author: comment.profiles?.email || 'Unknown User',
+              author: comment.profiles?.username || 'Member',
               created_at: comment.created_at,
             }))
           };
@@ -597,7 +593,7 @@ const Feed = () => {
           created_at,
           user_id,
           profiles!posts_user_id_fkey (
-            email
+            username
           )
         `)
         .single();
@@ -607,7 +603,7 @@ const Feed = () => {
       const postToAdd: Post = {
         id: newPost.id,
         content: newPost.content,
-        author: newPost.profiles?.email || 'You',
+        author: newPost.profiles?.username || 'You',
         created_at: newPost.created_at,
         type: 'user',
         likes: 0,
@@ -651,7 +647,7 @@ const Feed = () => {
           content,
           created_at,
           profiles!comments_user_id_fkey (
-            email
+            username
           )
         `)
         .single();
@@ -661,7 +657,7 @@ const Feed = () => {
       const commentToAdd: Comment = {
         id: newComment.id,
         content: newComment.content,
-        author: newComment.profiles?.email || 'You',
+        author: newComment.profiles?.username || 'You',
         created_at: newComment.created_at
       };
 
@@ -822,12 +818,12 @@ const Feed = () => {
     }
   };
 
-  const handleMentionSelect = (postId: string, email: string) => {
+  const handleMentionSelect = (postId: string, name: string) => {
     const currentText = commentInputs[postId] || '';
     const cursorPos = getMentionStartPosition(currentText);
     if (cursorPos !== -1) {
       const beforeMention = currentText.substring(0, cursorPos);
-      const afterMention = currentText.substring(cursorPos).replace(/@\w*/, `@${email} `);
+      const afterMention = currentText.substring(cursorPos).replace(/@\w*/, `@${name} `);
       const newText = beforeMention + afterMention;
       
       setCommentInputs(prev => ({
@@ -860,7 +856,7 @@ const Feed = () => {
     if (mentionStartPos !== -1) {
       const mentionText = value.substring(mentionStartPos + 1);
       const filteredMembers = groupMembers.filter(member => 
-        member.email.toLowerCase().includes(mentionText.toLowerCase())
+        member.name.toLowerCase().includes(mentionText.toLowerCase())
       );
 
       if (filteredMembers.length > 0 && textareaElement) {
@@ -1061,7 +1057,7 @@ const Feed = () => {
                                 <div key={member.id} className="flex items-center justify-between p-2 border rounded">
                                   <div>
                                     <div className="flex items-center gap-2">
-                                      <span className="font-medium">{member.email}</span>
+                                      <span className="font-medium">{member.name}</span>
                                       {member.role === 'admin' && (
                                         <Crown className="h-3 w-3 text-yellow-500" />
                                       )}
@@ -1081,7 +1077,7 @@ const Feed = () => {
                                         <AlertDialogHeader>
                                           <AlertDialogTitle>Remove Member</AlertDialogTitle>
                                           <AlertDialogDescription>
-                                            Are you sure you want to remove {member.email} from the group?
+                                            Are you sure you want to remove {member.name} from the group?
                                           </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
@@ -1714,13 +1710,13 @@ const Feed = () => {
                                       {mentionSuggestions.suggestions.map((member) => (
                                         <CommandItem
                                           key={member.id}
-                                          onSelect={() => handleMentionSelect(post.id, member.email)}
+                                          onSelect={() => handleMentionSelect(post.id, member.name)}
                                           className="flex items-center gap-2 cursor-pointer"
                                         >
                                           <div className="h-6 w-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
-                                            {member.email.charAt(0).toUpperCase()}
+                                            {member.name.charAt(0).toUpperCase()}
                                           </div>
-                                          <span className="text-sm">{member.email}</span>
+                                          <span className="text-sm">{member.name}</span>
                                           {member.role === 'admin' && (
                                             <Crown className="h-3 w-3 text-yellow-500 ml-auto" />
                                           )}
