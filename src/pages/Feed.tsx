@@ -129,31 +129,45 @@ const Feed = () => {
 
   const fetchUserGroups = async () => {
     try {
-      const { data, error } = await supabase
+      // Step 1: Get user's group memberships
+      const { data: memberships, error: membershipError } = await supabase
         .from('group_memberships')
-        .select(`
-          group_id,
-          groups (
-            id,
-            name,
-            description,
-            invite_code,
-            created_at,
-            created_by,
-            automated_news_enabled,
-            news_prompt,
-            update_frequency,
-            news_count,
-            last_news_generation,
-            news_generation_status,
-            last_generation_error
-          )
-        `)
+        .select('group_id')
         .eq('user_id', user?.id);
 
-      if (error) throw error;
+      if (membershipError) throw membershipError;
 
-      const userGroups = data?.map(membership => membership.groups).filter(Boolean) as Group[];
+      if (!memberships || memberships.length === 0) {
+        setGroups([]);
+        setLoadingGroups(false);
+        return;
+      }
+
+      // Step 2: Get group details for each membership
+      const groupIds = memberships.map((m: { group_id: string }) => m.group_id);
+      const { data: groupsData, error: groupsError } = await supabase
+        .from('groups')
+        .select(`
+          id,
+          name,
+          description,
+          invite_code,
+          created_at,
+          created_by,
+          automated_news_enabled,
+          news_prompt,
+          update_frequency,
+          news_count,
+          last_news_generation,
+          news_generation_status,
+          last_generation_error
+        `)
+        .in('id', groupIds)
+        .order('created_at', { ascending: false });
+
+      if (groupsError) throw groupsError;
+
+      const userGroups = (groupsData || []) as Group[];
       setGroups(userGroups);
       
       // Set first group as selected by default

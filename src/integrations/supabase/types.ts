@@ -448,6 +448,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_creator_of_group: {
+        Args: { p_group_id: string }
+        Returns: boolean
+      }
+      is_member_of_group: {
+        Args: { p_group_id: string }
+        Returns: boolean
+      }
       join_group_by_invite_code: {
         Args: { p_invite_code: string }
         Returns: string
