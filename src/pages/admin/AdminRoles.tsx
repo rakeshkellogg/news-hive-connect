@@ -21,6 +21,14 @@ interface UserProfile {
   roles: string[];
 }
 
+interface GroupWithLimit {
+  id: string;
+  name: string;
+  daily_news_limit: number;
+  created_by: string;
+  created_at: string;
+}
+
 const setSEO = (title: string, description: string, canonical: string) => {
   document.title = title;
   const desc = document.querySelector('meta[name="description"]');
@@ -49,7 +57,11 @@ export default function AdminRoles() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "suspended">("all");
+const [filterStatus, setFilterStatus] = useState<"all" | "active" | "suspended">("all");
+
+  const [groups, setGroups] = useState<GroupWithLimit[]>([]);
+  const [editingLimit, setEditingLimit] = useState<string | null>(null);
+  const [newLimit, setNewLimit] = useState<number>(10);
 
   useEffect(() => {
     setSEO(
@@ -110,12 +122,25 @@ export default function AdminRoles() {
       } catch (error) {
         console.error('Error loading users:', error);
         toast({ title: 'Error', description: 'Failed to load users', variant: 'destructive' });
-      } finally {
-        setLoading(false);
       }
     };
 
-    loadUsers();
+    const loadGroups = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('groups')
+          .select('id, name, daily_news_limit, created_by, created_at')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setGroups(data || []);
+      } catch (error) {
+        console.error('Error loading groups:', error);
+        toast({ title: 'Error', description: 'Failed to load groups', variant: 'destructive' });
+      }
+    };
+
+    Promise.all([loadUsers(), loadGroups()]).finally(() => setLoading(false));
   }, [allowed, toast]);
 
   const toggleSuperAdmin = async (userId: string, isSuperAdmin: boolean) => {
@@ -176,6 +201,24 @@ export default function AdminRoles() {
     } catch (error) {
       console.error('Error toggling suspension:', error);
       toast({ title: 'Error', description: 'Failed to update suspension', variant: 'destructive' });
+    }
+  };
+
+  const updateDailyLimit = async (groupId: string, limit: number) => {
+    try {
+      const { error } = await supabase
+        .from('groups')
+        .update({ daily_news_limit: limit })
+        .eq('id', groupId);
+
+      if (error) throw error;
+
+      toast({ title: 'Success', description: `Daily news limit updated to ${limit}` });
+      setEditingLimit(null);
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, daily_news_limit: limit } : g));
+    } catch (error) {
+      console.error('Error updating daily limit:', error);
+      toast({ title: 'Error', description: 'Failed to update daily limit', variant: 'destructive' });
     }
   };
 
@@ -333,6 +376,69 @@ export default function AdminRoles() {
               {filteredUsers.length === 0 && (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">No users found</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Groups Daily News Limits Section */}
+      <section className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Group Daily News Limits
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {groups.map((group) => (
+                <div key={group.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-medium">{group.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Current limit: {group.daily_news_limit} per 24 hours
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {editingLimit === group.id ? (
+                      <>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={newLimit}
+                          onChange={(e) => setNewLimit(parseInt(e.target.value) || 10)}
+                          className="w-24"
+                        />
+                        <Button size="sm" onClick={() => updateDailyLimit(group.id, newLimit)}>
+                          Save
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingLimit(null)}>
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingLimit(group.id);
+                          setNewLimit(group.daily_news_limit);
+                        }}
+                      >
+                        Edit Limit
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {groups.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No groups found</p>
                 </div>
               )}
             </div>

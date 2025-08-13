@@ -189,6 +189,7 @@ export type Database = {
           automated_news_enabled: boolean | null
           created_at: string
           created_by: string
+          daily_news_limit: number
           description: string | null
           id: string
           last_generation_error: string | null
@@ -205,6 +206,7 @@ export type Database = {
           automated_news_enabled?: boolean | null
           created_at?: string
           created_by: string
+          daily_news_limit?: number
           description?: string | null
           id?: string
           last_generation_error?: string | null
@@ -221,6 +223,7 @@ export type Database = {
           automated_news_enabled?: boolean | null
           created_at?: string
           created_by?: string
+          daily_news_limit?: number
           description?: string | null
           id?: string
           last_generation_error?: string | null
@@ -264,6 +267,51 @@ export type Database = {
           },
           {
             foreignKeyName: "likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      news_generation_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          generated_at: string
+          group_id: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          generated_at?: string
+          group_id: string
+          id?: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          generated_at?: string
+          group_id?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_generation_logs_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "news_generation_logs_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -441,6 +489,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_generate_news: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: {
+          can_generate: boolean
+          remaining_count: number
+          limit_count: number
+          message: string
+        }[]
+      }
       get_platform_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -484,6 +541,15 @@ export type Database = {
       }
       join_group_by_invite_code: {
         Args: { p_invite_code: string }
+        Returns: string
+      }
+      log_news_generation: {
+        Args: {
+          p_group_id: string
+          p_user_id: string
+          p_status: string
+          p_error_message?: string
+        }
         Returns: string
       }
       regenerate_group_invite: {

@@ -117,6 +117,13 @@ const [searchKeyword, setSearchKeyword] = useState("");
 const [timelineFilter, setTimelineFilter] = useState("all");
 const [inviteCode, setInviteCode] = useState<string | null>(null);
 
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    can_generate: boolean;
+    remaining_count: number;
+    limit_count: number;
+    message: string;
+  } | null>(null);
+
 
   useEffect(() => {
     if (!loading && !user) {
@@ -266,6 +273,22 @@ const fetchInviteCode = async (groupId: string) => {
   }
 };
 
+  const checkRateLimit = async (groupId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('can_generate_news', {
+        p_group_id: groupId,
+        p_user_id: user?.id || ''
+      });
+      if (error) throw error;
+      const info = (data && (data as any[])[0]) || null;
+      setRateLimitInfo(info);
+      return info;
+    } catch (error) {
+      console.error('Error checking rate limit:', error);
+      return null;
+    }
+  };
+
 
   // Fetch posts for selected group with optional filtering
   const fetchPosts = async (groupId: string) => {
@@ -374,6 +397,12 @@ const fetchInviteCode = async (groupId: string) => {
       fetchPosts(selectedGroup.id);
     }
   }, [selectedGroup, user?.id, searchKeyword, timelineFilter]);
+
+  useEffect(() => {
+    if (selectedGroup && user) {
+      checkRateLimit(selectedGroup.id);
+    }
+  }, [selectedGroup, user]);
 
   const toggleLike = async (postId: string) => {
     try {
@@ -786,8 +815,19 @@ const fetchInviteCode = async (groupId: string) => {
       return;
     }
 
+    // Check rate limit first
+    const info = await checkRateLimit(selectedGroup.id);
+    if (info && !info.can_generate) {
+      toast({
+        title: "Daily limit reached",
+        description: info.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      console.log('Starting news generation for group:', selectedGroup.id);
+      console.log('Starting manual news generation for group:', selectedGroup.id);
       console.log('Group settings:', {
         automated_news_enabled: selectedGroup.automated_news_enabled,
         news_prompt: selectedGroup.news_prompt,
@@ -800,7 +840,11 @@ const fetchInviteCode = async (groupId: string) => {
       });
 
       const { data, error } = await supabase.functions.invoke('generate-news', {
-        body: { groupId: selectedGroup.id }
+        body: { 
+          groupId: selectedGroup.id,
+          isManualRequest: true,
+          userId: user?.id
+        }
       });
 
       console.log('Generate news response:', { data, error });
@@ -819,6 +863,7 @@ const fetchInviteCode = async (groupId: string) => {
       // Refresh posts and groups to show the new news and updated status
       await fetchPosts(selectedGroup.id);
       await fetchUserGroups();
+      await checkRateLimit(selectedGroup.id);
 
       const message = data?.results?.[0]?.message || 'news posts';
       console.log('News generation completed successfully:', message);
@@ -827,12 +872,12 @@ const fetchInviteCode = async (groupId: string) => {
         title: "News generated!",
         description: `Latest news has been added to the group. ${message}`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating news:', error);
-      
+
       let errorMessage = "Failed to generate news. Please try again.";
-      
-      if (error.message) {
+
+      if (error?.message) {
         if (error.message.includes('timeout')) {
           errorMessage = "Request timed out. Please try again.";
         } else if (error.message.includes('rate limit')) {
@@ -841,7 +886,7 @@ const fetchInviteCode = async (groupId: string) => {
           errorMessage = "API service temporarily unavailable. Please try again.";
         }
       }
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -1379,13 +1424,20 @@ const fetchInviteCode = async (groupId: string) => {
                  <div className="flex gap-2">
                    {/* Generate News Button - Only for admins with automated news enabled */}
                    {isGroupAdmin(selectedGroup) && selectedGroup?.automated_news_enabled && (
-                     <Button 
-                       variant="outline"
-                       onClick={generateNews}
-                     >
-                       <Newspaper className="h-4 w-4 mr-2" />
-                       Generate News
-                     </Button>
+                     <>
+                       <Button 
+                         variant="outline"
+                         onClick={generateNews}
+                       >
+                         <Newspaper className="h-4 w-4 mr-2" />
+                         Generate News
+                       </Button>
+                       {rateLimitInfo && (
+                         <span className="text-sm text-muted-foreground">
+                           {rateLimitInfo.remaining_count} of {rateLimitInfo.limit_count} remaining today
+                         </span>
+                       )}
+                     </>
                    )}
                    
                    <Dialog open={showCreatePost} onOpenChange={setShowCreatePost}>

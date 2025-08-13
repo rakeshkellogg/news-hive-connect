@@ -201,6 +201,35 @@ serve(async (req) => {
           continue;
         }
 
+        // Rate limiting check per user/group
+        const actorUserId = (body && body.userId) ? body.userId : group.created_by;
+        const { data: rateLimitData, error: rateLimitError } = await supabaseClient
+          .rpc('can_generate_news', {
+            p_group_id: group.id,
+            p_user_id: actorUserId,
+          });
+
+        if (rateLimitError) {
+          console.error('Rate limit check error:', rateLimitError);
+          results.push({ group: group.name, status: 'error', message: 'Rate limit check failed' });
+          continue;
+        }
+
+        if (!(rateLimitData && rateLimitData[0]?.can_generate)) {
+          const message = rateLimitData?.[0]?.message || 'Daily limit reached';
+          console.log(`Rate limit exceeded for group ${group.name}: ${message}`);
+          await supabaseClient.rpc('log_news_generation', {
+            p_group_id: group.id,
+            p_user_id: actorUserId,
+            p_status: 'rate_limited',
+            p_error_message: message,
+          });
+          results.push({ group: group.name, status: 'rate_limited', message });
+          continue;
+        }
+
+        console.log(`Rate limit check passed for group ${group.name}. Remaining: ${rateLimitData[0].remaining_count}`);
+
         // Update status to running
         await supabaseClient
           .from('groups')
@@ -495,6 +524,13 @@ ${article.summary}
           console.error('Failed to update generation status for group', group.id, updateGroupError);
         }
 
+        // Log successful generation
+        await supabaseClient.rpc('log_news_generation', {
+          p_group_id: group.id,
+          p_user_id: actorUserId,
+          p_status: 'success',
+        });
+
         results.push({
           group: group.name,
           status: 'success',
@@ -503,18 +539,29 @@ ${article.summary}
 
         console.log(`Generated enhanced news for group: ${group.name}`);
 
-      } catch (error) {
-        console.error(`Error processing group ${group.name}:`, error);
-        await supabaseClient
-          .from('groups')
-          .update({ news_generation_status: 'failed', last_generation_error: (error as any).message || 'Unknown error' })
-          .eq('id', group.id);
-        results.push({
-          group: group.name,
-          status: 'error',
-          message: (error as any).message || 'Unknown error'
-        });
-      }
+        } catch (error) {
+          console.error(`Error processing group ${group.name}:`, error);
+          try {
+            const actorUserId = (body && body.userId) ? body.userId : group.created_by;
+            await supabaseClient.rpc('log_news_generation', {
+              p_group_id: group.id,
+              p_user_id: actorUserId,
+              p_status: 'failed',
+              p_error_message: (error as any).message || 'Unknown error',
+            });
+          } catch (logErr) {
+            console.error('Failed to log news generation failure:', logErr);
+          }
+          await supabaseClient
+            .from('groups')
+            .update({ news_generation_status: 'failed', last_generation_error: (error as any).message || 'Unknown error' })
+            .eq('id', group.id);
+          results.push({
+            group: group.name,
+            status: 'error',
+            message: (error as any).message || 'Unknown error'
+          });
+        }
     }
 
     return new Response(JSON.stringify({ 
