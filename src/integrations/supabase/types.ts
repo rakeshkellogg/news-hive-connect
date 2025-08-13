@@ -116,6 +116,35 @@ export type Database = {
           },
         ]
       }
+      group_invites: {
+        Row: {
+          created_at: string
+          group_id: string
+          invite_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          invite_code?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          invite_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_invites_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: true
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_memberships: {
         Row: {
           group_id: string
@@ -162,7 +191,6 @@ export type Database = {
           created_by: string
           description: string | null
           id: string
-          invite_code: string
           last_generation_error: string | null
           last_news_generation: string | null
           last_news_run_at: string | null
@@ -179,7 +207,6 @@ export type Database = {
           created_by: string
           description?: string | null
           id?: string
-          invite_code?: string
           last_generation_error?: string | null
           last_news_generation?: string | null
           last_news_run_at?: string | null
@@ -196,7 +223,6 @@ export type Database = {
           created_by?: string
           description?: string | null
           id?: string
-          invite_code?: string
           last_generation_error?: string | null
           last_news_generation?: string | null
           last_news_run_at?: string | null
@@ -458,6 +484,10 @@ export type Database = {
       }
       join_group_by_invite_code: {
         Args: { p_invite_code: string }
+        Returns: string
+      }
+      regenerate_group_invite: {
+        Args: { p_group_id: string }
         Returns: string
       }
     }

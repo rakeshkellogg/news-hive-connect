@@ -65,36 +65,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const joinGroupByInviteCode = async (inviteCode: string, userId: string) => {
     try {
       console.log('Joining group with user ID:', userId, 'and invite code:', inviteCode);
-      
-      // Find the group by invite code
-      const { data: group, error: groupError } = await supabase
-        .from('groups')
-        .select('id')
-        .eq('invite_code', inviteCode)
-        .single();
 
-      if (groupError) {
-        console.error('Error finding group:', groupError);
-        throw groupError;
+      // Use RPC to validate invite code and join group atomically
+      const { data: groupId, error } = await (supabase as any).rpc('join_group_by_invite_code', {
+        p_invite_code: inviteCode,
+      });
+
+      if (error) {
+        console.error('Error joining group via RPC:', error);
+        throw error;
       }
 
-      console.log('Found group:', group);
-
-      // Join the group
-      const { error: membershipError } = await supabase
-        .from('group_memberships')
-        .insert({
-          group_id: group.id,
-          user_id: userId,
-          role: 'member'
-        });
-
-      if (membershipError) {
-        console.error('Error creating membership:', membershipError);
-        throw membershipError;
-      }
-      
-      console.log('Successfully joined group');
+      console.log('Successfully joined group', groupId);
     } catch (error) {
       console.error('Error joining group:', error);
     }

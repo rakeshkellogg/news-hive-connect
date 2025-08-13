@@ -46,7 +46,6 @@ interface Group {
   id: string;
   name: string;
   description: string;
-  invite_code: string;
   created_at: string;
   created_by: string;
   member_count?: number;
@@ -58,6 +57,7 @@ interface Group {
   news_generation_status?: string;
   last_generation_error?: string;
 }
+
 
 interface Post {
   id: string;
@@ -113,8 +113,10 @@ const Feed = () => {
     news_count: 10
   });
   const [editingPost, setEditingPost] = useState<{ id: string; content: string } | null>(null);
-  const [searchKeyword, setSearchKeyword] = useState("");
-  const [timelineFilter, setTimelineFilter] = useState("all");
+const [searchKeyword, setSearchKeyword] = useState("");
+const [timelineFilter, setTimelineFilter] = useState("all");
+const [inviteCode, setInviteCode] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (!loading && !user) {
@@ -151,7 +153,6 @@ const Feed = () => {
           id,
           name,
           description,
-          invite_code,
           created_at,
           created_by,
           automated_news_enabled,
@@ -240,14 +241,31 @@ const Feed = () => {
     }
   };
 
-  const copyInviteLink = (inviteCode: string) => {
-    const inviteUrl = `${window.location.origin}/auth?invite=${inviteCode}`;
-    navigator.clipboard.writeText(inviteUrl);
-    toast({
-      title: "Invite link copied!",
-      description: "Share this link with others to invite them to the group.",
-    });
-  };
+const copyInviteLink = (inviteCode: string) => {
+  const inviteUrl = `${window.location.origin}/auth?invite=${inviteCode}`;
+  navigator.clipboard.writeText(inviteUrl);
+  toast({
+    title: "Invite link copied!",
+    description: "Share this link with others to invite them to the group.",
+  });
+};
+
+const fetchInviteCode = async (groupId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('group_invites')
+      .select('invite_code')
+      .eq('group_id', groupId)
+      .maybeSingle();
+
+    if (error) throw error;
+    setInviteCode(data?.invite_code || null);
+  } catch (e) {
+    setInviteCode(null);
+    toast({ title: 'Cannot load invite code', description: 'You might not have permission.', variant: 'destructive' });
+  }
+};
+
 
   // Fetch posts for selected group with optional filtering
   const fetchPosts = async (groupId: string) => {
@@ -985,8 +1003,12 @@ const Feed = () => {
                   
                   {/* Group Controls */}
                   <div className="flex gap-2">
-                    {/* Invite Button - Available to all members */}
-                    <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+                  {/* Invite Button - Only visible to group owner */}
+                  {isGroupAdmin(selectedGroup) && (
+                    <Dialog open={showInviteDialog} onOpenChange={(open) => {
+                      setShowInviteDialog(open);
+                      if (open) fetchInviteCode(selectedGroup.id);
+                    }}>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm">
                           <Share2 className="h-4 w-4 mr-2" />
@@ -1004,14 +1026,15 @@ const Feed = () => {
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              value={`${window.location.origin}/auth?invite=${selectedGroup.invite_code}`}
+                              value={`${window.location.origin}/auth?invite=${inviteCode ?? ''}`}
                               readOnly
                               className="flex-1 px-3 py-2 border rounded text-sm bg-muted"
                             />
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => copyInviteLink(selectedGroup.invite_code)}
+                              disabled={!inviteCode}
+                              onClick={() => inviteCode && copyInviteLink(inviteCode)}
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
@@ -1022,6 +1045,8 @@ const Feed = () => {
                         </div>
                       </DialogContent>
                     </Dialog>
+                  )}
+
 
                     {/* Leave Group Button - Available to non-admin members */}
                     {!isGroupAdmin(selectedGroup) && (
