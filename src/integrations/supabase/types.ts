@@ -425,6 +425,13 @@ export type Database = {
           flagged_comments: number
         }[]
       }
+      get_public_profiles: {
+        Args: { ids: string[] }
+        Returns: {
+          user_id: string
+          username: string
+        }[]
+      }
       get_user_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
