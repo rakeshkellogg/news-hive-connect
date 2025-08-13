@@ -122,8 +122,9 @@ serve(async (req) => {
     }
 
     // Get the request body to check for specific group ID
-    const body = await req.json().catch(() => ({}));
-    const { groupId } = body;
+    const body = await req.json().catch(() => ({} as any));
+    const { groupId, isManualRequest } = body;
+
 
     let groups;
     if (groupId) {
@@ -178,28 +179,33 @@ serve(async (req) => {
           news_count: group.news_count
         });
 
-        // Check frequency using last_news_generation
+        // Check frequency using last_news_generation (skip for manual requests)
         let shouldGenerate = true;
-        if (group.last_news_generation) {
-          const lastGeneration = new Date(group.last_news_generation);
-          const now = new Date();
-          const daysSince = Math.floor((now.getTime() - lastGeneration.getTime()) / (1000 * 60 * 60 * 24));
-          const required = group.update_frequency || 1;
-          console.log(`Days since last generation for ${group.name}: ${daysSince}`);
-          console.log(`Required frequency: ${required} days`);
-          shouldGenerate = daysSince >= required;
+        if (!isManualRequest) {
+          if (group.last_news_generation) {
+            const lastGeneration = new Date(group.last_news_generation);
+            const now = new Date();
+            const daysSince = Math.floor((now.getTime() - lastGeneration.getTime()) / (1000 * 60 * 60 * 24));
+            const required = group.update_frequency || 1;
+            console.log(`Days since last generation for ${group.name}: ${daysSince}`);
+            console.log(`Required frequency: ${required} days`);
+            shouldGenerate = daysSince >= required;
+          } else {
+            console.log(`No previous generation for group ${group.name}, generating now`);
+          }
+
+          if (!shouldGenerate) {
+            results.push({
+              group: group.name,
+              status: 'skipped',
+              message: `Frequency not met (${group.update_frequency || 1} days)`
+            });
+            continue;
+          }
         } else {
-          console.log(`No previous generation for group ${group.name}, generating now`);
+          console.log('Manual request detected; bypassing frequency check.');
         }
 
-        if (!shouldGenerate) {
-          results.push({
-            group: group.name,
-            status: 'skipped',
-            message: `Frequency not met (${group.update_frequency || 1} days)`
-          });
-          continue;
-        }
 
         // Rate limiting check per user/group
         const actorUserId = (body && body.userId) ? body.userId : group.created_by;
