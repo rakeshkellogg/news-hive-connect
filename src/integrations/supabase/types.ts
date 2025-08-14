@@ -199,6 +199,7 @@ export type Database = {
           news_count: number
           news_generation_status: string | null
           news_prompt: string | null
+          news_sources: string[] | null
           update_frequency: number | null
           updated_at: string
         }
@@ -216,6 +217,7 @@ export type Database = {
           news_count?: number
           news_generation_status?: string | null
           news_prompt?: string | null
+          news_sources?: string[] | null
           update_frequency?: number | null
           updated_at?: string
         }
@@ -233,6 +235,7 @@ export type Database = {
           news_count?: number
           news_generation_status?: string | null
           news_prompt?: string | null
+          news_sources?: string[] | null
           update_frequency?: number | null
           updated_at?: string
         }

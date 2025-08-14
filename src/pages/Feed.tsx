@@ -53,6 +53,7 @@ interface Group {
   news_prompt?: string;
   update_frequency?: number;
   news_count?: number;
+  news_sources?: string[];
   last_news_generation?: string;
   news_generation_status?: string;
   last_generation_error?: string;
@@ -110,7 +111,8 @@ const Feed = () => {
     automated_news_enabled: false,
     news_prompt: '',
     update_frequency: 1,
-    news_count: 10
+    news_count: 10,
+    news_sources: [] as string[]
   });
   const [editingPost, setEditingPost] = useState<{ id: string; content: string } | null>(null);
 const [searchKeyword, setSearchKeyword] = useState("");
@@ -166,6 +168,7 @@ const [inviteCode, setInviteCode] = useState<string | null>(null);
           news_prompt,
           update_frequency,
           news_count,
+          news_sources,
           last_news_generation,
           news_generation_status,
           last_generation_error
@@ -188,7 +191,8 @@ const [inviteCode, setInviteCode] = useState<string | null>(null);
           automated_news_enabled: userGroups[0].automated_news_enabled || false,
           news_prompt: userGroups[0].news_prompt || '',
           update_frequency: userGroups[0].update_frequency || 1,
-          news_count: userGroups[0].news_count || 10
+          news_count: userGroups[0].news_count || 10,
+          news_sources: userGroups[0].news_sources || []
         });
       }
     } catch (error) {
@@ -760,7 +764,8 @@ const fetchInviteCode = async (groupId: string) => {
           automated_news_enabled: settingsForm.automated_news_enabled,
           news_prompt: settingsForm.news_prompt,
           update_frequency: settingsForm.update_frequency,
-          news_count: settingsForm.news_count
+          news_count: settingsForm.news_count,
+          news_sources: settingsForm.news_sources
         })
         .eq('id', selectedGroup.id);
 
@@ -773,7 +778,8 @@ const fetchInviteCode = async (groupId: string) => {
         automated_news_enabled: settingsForm.automated_news_enabled,
         news_prompt: settingsForm.news_prompt,
         update_frequency: settingsForm.update_frequency,
-        news_count: settingsForm.news_count
+        news_count: settingsForm.news_count,
+        news_sources: settingsForm.news_sources
       } : null);
 
       // Update the group in the groups array
@@ -986,13 +992,14 @@ const fetchInviteCode = async (groupId: string) => {
                          setSelectedGroup(group);
                          fetchGroupMembers(group.id);
                          // Update settings form when group changes
-                           setSettingsForm({
-                             name: group.name || '',
-                             automated_news_enabled: group.automated_news_enabled || false,
-                             news_prompt: group.news_prompt || '',
-                             update_frequency: group.update_frequency || 1,
-                             news_count: group.news_count || 10
-                           });
+                            setSettingsForm({
+                              name: group.name || '',
+                              automated_news_enabled: group.automated_news_enabled || false,
+                              news_prompt: group.news_prompt || '',
+                              update_frequency: group.update_frequency || 1,
+                              news_count: group.news_count || 10,
+                              news_sources: group.news_sources || []
+                            });
                        }}
                      >
                       {group.name}
@@ -1306,23 +1313,147 @@ const fetchInviteCode = async (groupId: string) => {
                                      </div>
                                    </div>
 
-                                   <div className="space-y-2">
-                                     <Label htmlFor="news-count">Number of News Articles</Label>
-                                     <Input
-                                       id="news-count"
-                                       type="number"
-                                       min="1"
-                                       max="20"
-                                       placeholder="10"
-                                       value={settingsForm.news_count}
-                                       onChange={(e) => 
-                                         setSettingsForm(prev => ({
-                                           ...prev,
-                                           news_count: parseInt(e.target.value) || 10
-                                         }))
-                                       }
-                                     />
-                                   </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="news-count">Number of News Articles</Label>
+                                      <Input
+                                        id="news-count"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        placeholder="10"
+                                        value={settingsForm.news_count}
+                                        onChange={(e) => 
+                                          setSettingsForm(prev => ({
+                                            ...prev,
+                                            news_count: parseInt(e.target.value) || 10
+                                          }))
+                                        }
+                                      />
+                                    </div>
+
+                                    <div className="space-y-3">
+                                      <Label>News Sources</Label>
+                                      <div className="text-sm text-muted-foreground mb-2">
+                                        Add specific domains for Perplexity to prioritize when searching for news (e.g., "techcrunch.com", "reuters.com")
+                                      </div>
+                                      
+                                      {/* Current Sources */}
+                                      {settingsForm.news_sources.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mb-3">
+                                          {settingsForm.news_sources.map((source, index) => (
+                                            <div key={index} className="flex items-center gap-1 bg-muted px-2 py-1 rounded text-sm">
+                                              {source}
+                                              <button
+                                                type="button"
+                                                onClick={() => setSettingsForm(prev => ({
+                                                  ...prev,
+                                                  news_sources: prev.news_sources.filter((_, i) => i !== index)
+                                                }))}
+                                                className="ml-1 text-muted-foreground hover:text-foreground"
+                                              >
+                                                ×
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Add Source Input */}
+                                      <div className="flex gap-2">
+                                        <Input
+                                          id="new-source"
+                                          placeholder="domain.com"
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              const input = e.currentTarget;
+                                              const domain = input.value.trim().toLowerCase();
+                                              if (domain && !settingsForm.news_sources.includes(domain)) {
+                                                // Basic domain validation
+                                                const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+                                                if (domainRegex.test(domain)) {
+                                                  setSettingsForm(prev => ({
+                                                    ...prev,
+                                                    news_sources: [...prev.news_sources, domain]
+                                                  }));
+                                                  input.value = '';
+                                                }
+                                              }
+                                            }
+                                          }}
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                                            const domain = input.value.trim().toLowerCase();
+                                            if (domain && !settingsForm.news_sources.includes(domain)) {
+                                              const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+                                              if (domainRegex.test(domain)) {
+                                                setSettingsForm(prev => ({
+                                                  ...prev,
+                                                  news_sources: [...prev.news_sources, domain]
+                                                }));
+                                                input.value = '';
+                                              }
+                                            }
+                                          }}
+                                        >
+                                          Add
+                                        </Button>
+                                      </div>
+
+                                      {/* Quick Add Presets */}
+                                      <div className="space-y-2">
+                                        <div className="text-xs text-muted-foreground">Quick add:</div>
+                                        <div className="flex flex-wrap gap-2">
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              const techSources = ['techcrunch.com', 'arstechnica.com', 'theverge.com'];
+                                              setSettingsForm(prev => ({
+                                                ...prev,
+                                                news_sources: [...new Set([...prev.news_sources, ...techSources])]
+                                              }));
+                                            }}
+                                          >
+                                            Tech News
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              const businessSources = ['bloomberg.com', 'reuters.com', 'wsj.com'];
+                                              setSettingsForm(prev => ({
+                                                ...prev,
+                                                news_sources: [...new Set([...prev.news_sources, ...businessSources])]
+                                              }));
+                                            }}
+                                          >
+                                            Business
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              const generalSources = ['cnn.com', 'bbc.com', 'npr.org'];
+                                              setSettingsForm(prev => ({
+                                                ...prev,
+                                                news_sources: [...new Set([...prev.news_sources, ...generalSources])]
+                                              }));
+                                            }}
+                                          >
+                                            General News
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
                                   </>
                                 )}
                                

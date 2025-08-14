@@ -308,7 +308,9 @@ CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, o
               search_recency_filter: 'day', // Perplexity day filter + 48hr validation
               frequency_penalty: 1,
               presence_penalty: 0,
-              search_domain_filter: ["reuters.com", "bloomberg.com", "techcrunch.com", "cnn.com", "bbc.com", "wsj.com", "ft.com", "nasdaq.com", "marketwatch.com"]
+              search_domain_filter: group.news_sources && group.news_sources.length > 0 
+                ? group.news_sources 
+                : ["reuters.com", "bloomberg.com", "techcrunch.com", "cnn.com", "bbc.com", "wsj.com", "ft.com", "nasdaq.com", "marketwatch.com"]
             })
           });
 
