@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1343,24 +1344,26 @@ const fetchInviteCode = async (groupId: string) => {
                                          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                            Current Sources ({settingsForm.news_sources.length})
                                          </div>
-                                         {settingsForm.news_sources.length > 0 ? (
-                                           <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border">
-                                             {settingsForm.news_sources.map((source, index) => (
-                                               <div key={index} className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-medium border border-primary/20">
-                                                 {source}
-                                                 <button
-                                                   type="button"
-                                                   onClick={() => setSettingsForm(prev => ({
-                                                     ...prev,
-                                                     news_sources: prev.news_sources.filter((_, i) => i !== index)
-                                                   }))}
-                                                   className="ml-1 text-primary/60 hover:text-primary hover:bg-primary/20 rounded-full w-4 h-4 flex items-center justify-center text-xs"
-                                                 >
-                                                   ×
-                                                 </button>
-                                               </div>
-                                             ))}
-                                           </div>
+                                          {settingsForm.news_sources.length > 0 ? (
+                                            <ScrollArea className="h-32">
+                                              <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border">
+                                                {settingsForm.news_sources.map((source, index) => (
+                                                  <div key={index} className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-medium border border-primary/20">
+                                                    {source}
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setSettingsForm(prev => ({
+                                                        ...prev,
+                                                        news_sources: prev.news_sources.filter((_, i) => i !== index)
+                                                      }))}
+                                                      className="ml-1 text-primary/60 hover:text-primary hover:bg-primary/20 rounded-full w-4 h-4 flex items-center justify-center text-xs"
+                                                    >
+                                                      ×
+                                                    </button>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </ScrollArea>
                                          ) : (
                                            <div className="p-3 bg-muted/30 rounded-lg border-dashed border-2 text-center text-sm text-muted-foreground">
                                              No news sources added yet. Add sources below to prioritize specific domains.
