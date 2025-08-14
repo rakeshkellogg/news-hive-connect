@@ -1362,21 +1362,33 @@ const fetchInviteCode = async (groupId: string) => {
                                       <div className="flex gap-2">
                                         <Input
                                           id="new-source"
-                                          placeholder="domain.com"
+                                          placeholder="domain1.com, domain2.com, domain3.com"
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                               e.preventDefault();
                                               const input = e.currentTarget;
-                                              const domain = input.value.trim().toLowerCase();
-                                              if (domain && !settingsForm.news_sources.includes(domain)) {
-                                                // Basic domain validation
+                                              const inputValue = input.value.trim();
+                                              if (inputValue) {
+                                                // Split by comma and process each domain
+                                                const domains = inputValue.split(',')
+                                                  .map(d => d.trim().toLowerCase())
+                                                  .filter(d => d.length > 0);
+                                                
                                                 const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-                                                if (domainRegex.test(domain)) {
+                                                const validDomains = domains.filter(domain => 
+                                                  domainRegex.test(domain) && !settingsForm.news_sources.includes(domain)
+                                                );
+                                                
+                                                if (validDomains.length > 0) {
                                                   setSettingsForm(prev => ({
                                                     ...prev,
-                                                    news_sources: [...prev.news_sources, domain]
+                                                    news_sources: [...prev.news_sources, ...validDomains]
                                                   }));
                                                   input.value = '';
+                                                  toast({
+                                                    title: "Sources added",
+                                                    description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
+                                                  });
                                                 }
                                               }
                                             }
@@ -1388,15 +1400,28 @@ const fetchInviteCode = async (groupId: string) => {
                                           size="sm"
                                           onClick={(e) => {
                                             const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                                            const domain = input.value.trim().toLowerCase();
-                                            if (domain && !settingsForm.news_sources.includes(domain)) {
+                                            const inputValue = input.value.trim();
+                                            if (inputValue) {
+                                              // Split by comma and process each domain
+                                              const domains = inputValue.split(',')
+                                                .map(d => d.trim().toLowerCase())
+                                                .filter(d => d.length > 0);
+                                              
                                               const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-                                              if (domainRegex.test(domain)) {
+                                              const validDomains = domains.filter(domain => 
+                                                domainRegex.test(domain) && !settingsForm.news_sources.includes(domain)
+                                              );
+                                              
+                                              if (validDomains.length > 0) {
                                                 setSettingsForm(prev => ({
                                                   ...prev,
-                                                  news_sources: [...prev.news_sources, domain]
+                                                  news_sources: [...prev.news_sources, ...validDomains]
                                                 }));
                                                 input.value = '';
+                                                toast({
+                                                  title: "Sources added",
+                                                  description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
+                                                });
                                               }
                                             }
                                           }}
