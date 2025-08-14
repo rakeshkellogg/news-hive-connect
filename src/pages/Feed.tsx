@@ -142,12 +142,12 @@ const [inviteCode, setInviteCode] = useState<string | null>(null);
   const fetchUserGroups = async () => {
     try {
       // Step 1: Get user's group memberships
-      const { data: memberships, error: membershipError } = await supabase
+      const { data: memberships, error: membershipsError } = await supabase
         .from('group_memberships')
         .select('group_id')
         .eq('user_id', user?.id);
 
-      if (membershipError) throw membershipError;
+      if (membershipsError) throw membershipsError;
 
       if (!memberships || memberships.length === 0) {
         setGroups([]);
@@ -184,16 +184,31 @@ const [inviteCode, setInviteCode] = useState<string | null>(null);
       
       // Set first group as selected by default
       if (userGroups.length > 0) {
-        setSelectedGroup(userGroups[0]);
-        fetchGroupMembers(userGroups[0].id);
-        // Initialize settings form with group data
+        const firstGroup = userGroups[0];
+        setSelectedGroup(firstGroup);
+        fetchGroupMembers(firstGroup.id);
+        
+        // Initialize settings form with group data - FIXED VERSION
         setSettingsForm({
-          name: userGroups[0].name || '',
-          automated_news_enabled: userGroups[0].automated_news_enabled || false,
-          news_prompt: userGroups[0].news_prompt || '',
-          update_frequency: userGroups[0].update_frequency || 1,
-          news_count: userGroups[0].news_count || 10,
-          news_sources: userGroups[0].news_sources || []
+          name: firstGroup.name || '',
+          automated_news_enabled: firstGroup.automated_news_enabled || false,
+          news_prompt: firstGroup.news_prompt || '',
+          update_frequency: firstGroup.update_frequency || 1,
+          news_count: firstGroup.news_count || 10,
+          news_sources: firstGroup.news_sources || ['perplexity.ai'] // Ensure default value
+        });
+
+        console.log('Initialized settings form with:', {
+          name: firstGroup.name,
+          news_sources: firstGroup.news_sources,
+          settingsForm: {
+            name: firstGroup.name || '',
+            automated_news_enabled: firstGroup.automated_news_enabled || false,
+            news_prompt: firstGroup.news_prompt || '',
+            update_frequency: firstGroup.update_frequency || 1,
+            news_count: firstGroup.news_count || 10,
+            news_sources: firstGroup.news_sources || ['perplexity.ai']
+          }
         });
       }
     } catch (error) {
@@ -205,6 +220,56 @@ const [inviteCode, setInviteCode] = useState<string | null>(null);
       });
     } finally {
       setLoadingGroups(false);
+    }
+  };
+
+  const refreshGroupData = async () => {
+    if (!selectedGroup) return;
+    
+    try {
+      // Fetch the updated group data
+      const { data: groupData, error } = await supabase
+        .from('groups')
+        .select(`
+          id,
+          name,
+          description,
+          created_at,
+          created_by,
+          automated_news_enabled,
+          news_prompt,
+          update_frequency,
+          news_count,
+          news_sources,
+          last_news_generation,
+          news_generation_status,
+          last_generation_error
+        `)
+        .eq('id', selectedGroup.id)
+        .single();
+
+      if (error) throw error;
+
+      // Update the selected group
+      setSelectedGroup(groupData);
+      
+      // Update the group in the groups array
+      setGroups(prev => prev.map(group => 
+        group.id === selectedGroup.id ? groupData : group
+      ));
+
+      // Update settings form with fresh data
+      setSettingsForm({
+        name: groupData.name || '',
+        automated_news_enabled: groupData.automated_news_enabled || false,
+        news_prompt: groupData.news_prompt || '',
+        update_frequency: groupData.update_frequency || 1,
+        news_count: groupData.news_count || 10,
+        news_sources: groupData.news_sources || ['perplexity.ai']
+      });
+
+    } catch (error) {
+      console.error('Error refreshing group data:', error);
     }
   };
 
@@ -408,6 +473,20 @@ const fetchInviteCode = async (groupId: string) => {
       checkRateLimit(selectedGroup.id);
     }
   }, [selectedGroup, user]);
+
+  // Synchronize settings form when selected group changes
+  useEffect(() => {
+    if (selectedGroup) {
+      setSettingsForm({
+        name: selectedGroup.name || '',
+        automated_news_enabled: selectedGroup.automated_news_enabled || false,
+        news_prompt: selectedGroup.news_prompt || '',
+        update_frequency: selectedGroup.update_frequency || 1,
+        news_count: selectedGroup.news_count || 10,
+        news_sources: selectedGroup.news_sources || ['perplexity.ai']
+      });
+    }
+  }, [selectedGroup]);
 
   const toggleLike = async (postId: string) => {
     try {
@@ -754,10 +833,12 @@ const fetchInviteCode = async (groupId: string) => {
     }
   };
 
-  const updateGroupSettings = async () => {
+  const saveGroupSettings = async () => {
     if (!selectedGroup) return;
 
     try {
+      console.log('Saving settings with news_sources:', settingsForm.news_sources);
+
       const { error } = await supabase
         .from('groups')
         .update({
@@ -772,31 +853,10 @@ const fetchInviteCode = async (groupId: string) => {
 
       if (error) throw error;
 
-      // Update the selected group in state
-      setSelectedGroup(prev => prev ? {
-        ...prev,
-        name: settingsForm.name,
-        automated_news_enabled: settingsForm.automated_news_enabled,
-        news_prompt: settingsForm.news_prompt,
-        update_frequency: settingsForm.update_frequency,
-        news_count: settingsForm.news_count,
-        news_sources: settingsForm.news_sources
-      } : null);
+      console.log('Settings saved successfully');
 
-      // Update the group in the groups array
-      setGroups(prev => prev.map(group => 
-        group.id === selectedGroup.id 
-          ? {
-              ...group,
-              name: settingsForm.name,
-              automated_news_enabled: settingsForm.automated_news_enabled,
-              news_prompt: settingsForm.news_prompt,
-              update_frequency: settingsForm.update_frequency,
-              news_count: settingsForm.news_count,
-              news_sources: settingsForm.news_sources
-            }
-          : group
-      ));
+      // Refresh the group data to ensure consistency
+      await refreshGroupData();
 
       setShowGroupSettings(false);
       toast({
@@ -993,15 +1053,15 @@ const fetchInviteCode = async (groupId: string) => {
                        onClick={() => {
                          setSelectedGroup(group);
                          fetchGroupMembers(group.id);
-                         // Update settings form when group changes
-                            setSettingsForm({
-                              name: group.name || '',
-                              automated_news_enabled: group.automated_news_enabled || false,
-                              news_prompt: group.news_prompt || '',
-                              update_frequency: group.update_frequency || 1,
-                              news_count: group.news_count || 10,
-                              news_sources: group.news_sources || []
-                            });
+                         // Update settings form when group changes - FIXED VERSION
+                         setSettingsForm({
+                           name: group.name || '',
+                           automated_news_enabled: group.automated_news_enabled || false,
+                           news_prompt: group.news_prompt || '',
+                           update_frequency: group.update_frequency || 1,
+                           news_count: group.news_count || 10,
+                           news_sources: group.news_sources || ['perplexity.ai'] // Ensure default value
+                         });
                        }}
                      >
                       {group.name}
@@ -1544,7 +1604,7 @@ const fetchInviteCode = async (groupId: string) => {
                                  <Button variant="outline" onClick={() => setShowGroupSettings(false)}>
                                    Cancel
                                  </Button>
-                                 <Button onClick={() => updateGroupSettings()}>
+                                 <Button onClick={() => saveGroupSettings()}>
                                    Save Settings
                                  </Button>
                                </div>
