@@ -791,7 +791,8 @@ const fetchInviteCode = async (groupId: string) => {
               automated_news_enabled: settingsForm.automated_news_enabled,
               news_prompt: settingsForm.news_prompt,
               update_frequency: settingsForm.update_frequency,
-              news_count: settingsForm.news_count
+              news_count: settingsForm.news_count,
+              news_sources: settingsForm.news_sources
             }
           : group
       ));
