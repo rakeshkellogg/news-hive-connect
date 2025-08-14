@@ -1359,14 +1359,68 @@ const fetchInviteCode = async (groupId: string) => {
                                       )}
 
                                       {/* Add Source Input */}
-                                      <div className="flex gap-2">
-                                        <Input
-                                          id="new-source"
-                                          placeholder="domain1.com, https://domain2.com, domain3.com/path"
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                              e.preventDefault();
-                                              const input = e.currentTarget;
+                                      <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                          <Input
+                                            id="new-source"
+                                            placeholder="domain.com, https://example.com/path, news.site.org"
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                const input = e.currentTarget;
+                                                const inputValue = input.value.trim();
+                                                if (inputValue) {
+                                                  // Split by comma and process each domain/URL
+                                                  const entries = inputValue.split(',')
+                                                    .map(d => d.trim())
+                                                    .filter(d => d.length > 0);
+                                                  
+                                                  // Extract domains from URLs or use as-is if already domain
+                                                  const extractDomain = (entry: string): string => {
+                                                    try {
+                                                      // Remove protocol if present
+                                                      let cleanEntry = entry.replace(/^https?:\/\//, '');
+                                                      // Extract just the hostname part (remove path, query, etc.)
+                                                      let domain = cleanEntry.split('/')[0].split('?')[0].split('#')[0];
+                                                      return domain.toLowerCase();
+                                                    } catch {
+                                                      return entry.toLowerCase();
+                                                    }
+                                                  };
+                                                  
+                                                  const domains = entries.map(extractDomain);
+                                                  const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+                                                  const validDomains = domains.filter(domain => 
+                                                    domainRegex.test(domain) && !settingsForm.news_sources.includes(domain)
+                                                  );
+                                                  
+                                                  if (validDomains.length > 0) {
+                                                    setSettingsForm(prev => ({
+                                                      ...prev,
+                                                      news_sources: [...prev.news_sources, ...validDomains]
+                                                    }));
+                                                    input.value = '';
+                                                    toast({
+                                                      title: "Sources added",
+                                                      description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
+                                                    });
+                                                  } else {
+                                                    toast({
+                                                      title: "No valid sources",
+                                                      description: "Please check the format of your URLs/domains",
+                                                      variant: "destructive"
+                                                    });
+                                                  }
+                                                }
+                                              }
+                                            }}
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              const input = e.currentTarget.previousElementSibling as HTMLInputElement;
                                               const inputValue = input.value.trim();
                                               if (inputValue) {
                                                 // Split by comma and process each domain/URL
@@ -1411,63 +1465,14 @@ const fetchInviteCode = async (groupId: string) => {
                                                   });
                                                 }
                                               }
-                                            }
-                                          }}
-                                        />
-                                        <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={(e) => {
-                                            const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                                            const inputValue = input.value.trim();
-                                            if (inputValue) {
-                                              // Split by comma and process each domain/URL
-                                              const entries = inputValue.split(',')
-                                                .map(d => d.trim())
-                                                .filter(d => d.length > 0);
-                                              
-                                              // Extract domains from URLs or use as-is if already domain
-                                              const extractDomain = (entry: string): string => {
-                                                try {
-                                                  // Remove protocol if present
-                                                  let cleanEntry = entry.replace(/^https?:\/\//, '');
-                                                  // Extract just the hostname part (remove path, query, etc.)
-                                                  let domain = cleanEntry.split('/')[0].split('?')[0].split('#')[0];
-                                                  return domain.toLowerCase();
-                                                } catch {
-                                                  return entry.toLowerCase();
-                                                }
-                                              };
-                                              
-                                              const domains = entries.map(extractDomain);
-                                              const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-                                              const validDomains = domains.filter(domain => 
-                                                domainRegex.test(domain) && !settingsForm.news_sources.includes(domain)
-                                              );
-                                              
-                                              if (validDomains.length > 0) {
-                                                setSettingsForm(prev => ({
-                                                  ...prev,
-                                                  news_sources: [...prev.news_sources, ...validDomains]
-                                                }));
-                                                input.value = '';
-                                                toast({
-                                                  title: "Sources added",
-                                                  description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
-                                                });
-                                              } else {
-                                                toast({
-                                                  title: "No valid sources",
-                                                  description: "Please check the format of your URLs/domains",
-                                                  variant: "destructive"
-                                                });
-                                              }
-                                            }
-                                          }}
-                                        >
-                                          Add
-                                        </Button>
+                                            }}
+                                          >
+                                            Add
+                                          </Button>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          Add domains (example.com) or full URLs (https://example.com/path). Separate multiple entries with commas.
+                                        </div>
                                       </div>
 
                                       {/* Quick Add Presets */}
