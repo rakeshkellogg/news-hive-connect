@@ -1362,18 +1362,32 @@ const fetchInviteCode = async (groupId: string) => {
                                       <div className="flex gap-2">
                                         <Input
                                           id="new-source"
-                                          placeholder="domain1.com, domain2.com, domain3.com"
+                                          placeholder="domain1.com, https://domain2.com, domain3.com/path"
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                               e.preventDefault();
                                               const input = e.currentTarget;
                                               const inputValue = input.value.trim();
                                               if (inputValue) {
-                                                // Split by comma and process each domain
-                                                const domains = inputValue.split(',')
-                                                  .map(d => d.trim().toLowerCase())
+                                                // Split by comma and process each domain/URL
+                                                const entries = inputValue.split(',')
+                                                  .map(d => d.trim())
                                                   .filter(d => d.length > 0);
                                                 
+                                                // Extract domains from URLs or use as-is if already domain
+                                                const extractDomain = (entry: string): string => {
+                                                  try {
+                                                    // Remove protocol if present
+                                                    let cleanEntry = entry.replace(/^https?:\/\//, '');
+                                                    // Extract just the hostname part (remove path, query, etc.)
+                                                    let domain = cleanEntry.split('/')[0].split('?')[0].split('#')[0];
+                                                    return domain.toLowerCase();
+                                                  } catch {
+                                                    return entry.toLowerCase();
+                                                  }
+                                                };
+                                                
+                                                const domains = entries.map(extractDomain);
                                                 const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
                                                 const validDomains = domains.filter(domain => 
                                                   domainRegex.test(domain) && !settingsForm.news_sources.includes(domain)
@@ -1389,6 +1403,12 @@ const fetchInviteCode = async (groupId: string) => {
                                                     title: "Sources added",
                                                     description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
                                                   });
+                                                } else {
+                                                  toast({
+                                                    title: "No valid sources",
+                                                    description: "Please check the format of your URLs/domains",
+                                                    variant: "destructive"
+                                                  });
                                                 }
                                               }
                                             }
@@ -1402,11 +1422,25 @@ const fetchInviteCode = async (groupId: string) => {
                                             const input = e.currentTarget.previousElementSibling as HTMLInputElement;
                                             const inputValue = input.value.trim();
                                             if (inputValue) {
-                                              // Split by comma and process each domain
-                                              const domains = inputValue.split(',')
-                                                .map(d => d.trim().toLowerCase())
+                                              // Split by comma and process each domain/URL
+                                              const entries = inputValue.split(',')
+                                                .map(d => d.trim())
                                                 .filter(d => d.length > 0);
                                               
+                                              // Extract domains from URLs or use as-is if already domain
+                                              const extractDomain = (entry: string): string => {
+                                                try {
+                                                  // Remove protocol if present
+                                                  let cleanEntry = entry.replace(/^https?:\/\//, '');
+                                                  // Extract just the hostname part (remove path, query, etc.)
+                                                  let domain = cleanEntry.split('/')[0].split('?')[0].split('#')[0];
+                                                  return domain.toLowerCase();
+                                                } catch {
+                                                  return entry.toLowerCase();
+                                                }
+                                              };
+                                              
+                                              const domains = entries.map(extractDomain);
                                               const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
                                               const validDomains = domains.filter(domain => 
                                                 domainRegex.test(domain) && !settingsForm.news_sources.includes(domain)
@@ -1421,6 +1455,12 @@ const fetchInviteCode = async (groupId: string) => {
                                                 toast({
                                                   title: "Sources added",
                                                   description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
+                                                });
+                                              } else {
+                                                toast({
+                                                  title: "No valid sources",
+                                                  description: "Please check the format of your URLs/domains",
+                                                  variant: "destructive"
                                                 });
                                               }
                                             }
