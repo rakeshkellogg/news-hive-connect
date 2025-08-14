@@ -141,6 +141,25 @@ const [inviteCode, setInviteCode] = useState<string | null>(null);
     }
   }, [user, loading, navigate]);
 
+  // Add this useEffect to sync settings form when selectedGroup changes
+  useEffect(() => {
+    if (selectedGroup) {
+      console.log('Syncing settings form with selectedGroup:', {
+        name: selectedGroup.name,
+        news_sources: selectedGroup.news_sources
+      });
+      
+      setSettingsForm({
+        name: selectedGroup.name || '',
+        automated_news_enabled: selectedGroup.automated_news_enabled || false,
+        news_prompt: selectedGroup.news_prompt || '',
+        update_frequency: selectedGroup.update_frequency || 1,
+        news_count: selectedGroup.news_count || 10,
+        news_sources: selectedGroup.news_sources || ['perplexity.ai']
+      });
+    }
+  }, [selectedGroup]);
+
   const fetchUserGroups = async () => {
     try {
       // Step 1: Get user's group memberships
@@ -1327,14 +1346,15 @@ const fetchInviteCode = async (groupId: string) => {
                                Settings
                              </Button>
                            </DialogTrigger>
-                           <DialogContent className="max-w-md">
-                             <DialogHeader>
-                               <DialogTitle>Group Settings</DialogTitle>
-                               <DialogDescription>
-                                 Configure automated news settings for {selectedGroup.name}
-                               </DialogDescription>
-                             </DialogHeader>
-                              <div className="space-y-4">
+                            <DialogContent className="max-w-md max-h-[90vh]">
+                              <DialogHeader>
+                                <DialogTitle>Group Settings</DialogTitle>
+                                <DialogDescription>
+                                  Configure automated news settings for {selectedGroup.name}
+                                </DialogDescription>
+                              </DialogHeader>
+                              <ScrollArea className="max-h-[70vh] pr-4">
+                                <div className="space-y-4">
                                 <div className="space-y-2">
                                   <Label htmlFor="group-name">Group Name</Label>
                                   <Input
@@ -1619,17 +1639,18 @@ const fetchInviteCode = async (groupId: string) => {
                                       </div>
                                     </div>
                                   </>
-                                )}
+                                 )}
+                                </div>
+                              </ScrollArea>
                                
-                               <div className="flex justify-end gap-2 pt-4">
-                                 <Button variant="outline" onClick={() => setShowGroupSettings(false)}>
-                                   Cancel
-                                 </Button>
-                                 <Button onClick={() => saveGroupSettings()}>
-                                   Save Settings
-                                 </Button>
-                               </div>
-                             </div>
+                              <div className="flex justify-end gap-2 pt-4 border-t">
+                                <Button variant="outline" onClick={() => setShowGroupSettings(false)}>
+                                  Cancel
+                                </Button>
+                                <Button onClick={() => saveGroupSettings()}>
+                                  Save Settings
+                                </Button>
+                              </div>
                            </DialogContent>
                           </Dialog>
 
