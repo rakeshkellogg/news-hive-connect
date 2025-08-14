@@ -126,6 +126,8 @@ const [inviteCode, setInviteCode] = useState<string | null>(null);
     limit_count: number;
     message: string;
   } | null>(null);
+  
+  const [newSourceInput, setNewSourceInput] = useState('');
 
 
   useEffect(() => {
@@ -833,6 +835,76 @@ const fetchInviteCode = async (groupId: string) => {
     }
   };
 
+  const addNewsSource = () => {
+    const inputValue = newSourceInput.trim();
+    if (!inputValue) return;
+
+    // Split by comma and process each domain/URL
+    const entries = inputValue.split(',')
+      .map(d => d.trim())
+      .filter(d => d.length > 0);
+    
+    // Extract domains from URLs or use as-is if already domain
+    const extractDomain = (entry: string): string => {
+      try {
+        // Remove protocol if present
+        let cleanEntry = entry.replace(/^https?:\/\//, '');
+        // Extract just the hostname part (remove path, query, etc.)
+        let domain = cleanEntry.split('/')[0].split('?')[0].split('#')[0];
+        return domain.toLowerCase();
+      } catch {
+        return entry.toLowerCase();
+      }
+    };
+    
+    const domains = entries.map(extractDomain);
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    const validDomains = domains.filter(domain => 
+      domainRegex.test(domain) && !settingsForm.news_sources.includes(domain)
+    );
+    
+    if (validDomains.length > 0) {
+      setSettingsForm(prev => ({
+        ...prev,
+        news_sources: [...prev.news_sources, ...validDomains]
+      }));
+      setNewSourceInput('');
+      toast({
+        title: "Sources added",
+        description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
+      });
+    } else {
+      toast({
+        title: "No valid sources",
+        description: "Please check the format of your URLs/domains",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const addQuickSources = (sources: string[]) => {
+    const validDomains = sources.filter(domain => 
+      !settingsForm.news_sources.includes(domain)
+    );
+    
+    if (validDomains.length > 0) {
+      setSettingsForm(prev => ({
+        ...prev,
+        news_sources: [...new Set([...prev.news_sources, ...validDomains])]
+      }));
+      toast({
+        title: "Sources added",
+        description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
+      });
+    } else {
+      toast({
+        title: "Sources already added",
+        description: "All selected sources are already in your list",
+        variant: "destructive"
+      });
+    }
+  };
+
   const saveGroupSettings = async () => {
     if (!selectedGroup) return;
 
@@ -1431,122 +1503,71 @@ const fetchInviteCode = async (groupId: string) => {
                                          )}
                                        </div>
 
-                                      {/* Add Source Input */}
-                                      <div className="space-y-2">
-                                        <div className="flex gap-2">
-                                          <Input
-                                            id="new-source"
-                                            placeholder="domain.com, https://example.com/path, news.site.org"
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                const input = e.currentTarget;
-                                                const inputValue = input.value.trim();
-                                                if (inputValue) {
-                                                  // Split by comma and process each domain/URL
-                                                  const entries = inputValue.split(',')
-                                                    .map(d => d.trim())
-                                                    .filter(d => d.length > 0);
-                                                  
-                                                  // Extract domains from URLs or use as-is if already domain
-                                                  const extractDomain = (entry: string): string => {
-                                                    try {
-                                                      // Remove protocol if present
-                                                      let cleanEntry = entry.replace(/^https?:\/\//, '');
-                                                      // Extract just the hostname part (remove path, query, etc.)
-                                                      let domain = cleanEntry.split('/')[0].split('?')[0].split('#')[0];
-                                                      return domain.toLowerCase();
-                                                    } catch {
-                                                      return entry.toLowerCase();
-                                                    }
-                                                  };
-                                                  
-                                                  const domains = entries.map(extractDomain);
-                                                  const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-                                                  const validDomains = domains.filter(domain => 
-                                                    domainRegex.test(domain) && !settingsForm.news_sources.includes(domain)
-                                                  );
-                                                  
-                                                  if (validDomains.length > 0) {
-                                                    setSettingsForm(prev => ({
-                                                      ...prev,
-                                                      news_sources: [...prev.news_sources, ...validDomains]
-                                                    }));
-                                                    input.value = '';
-                                                    toast({
-                                                      title: "Sources added",
-                                                      description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
-                                                    });
-                                                  } else {
-                                                    toast({
-                                                      title: "No valid sources",
-                                                      description: "Please check the format of your URLs/domains",
-                                                      variant: "destructive"
-                                                    });
-                                                  }
-                                                }
-                                              }
-                                            }}
-                                          />
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={(e) => {
-                                              const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                                              const inputValue = input.value.trim();
-                                              if (inputValue) {
-                                                // Split by comma and process each domain/URL
-                                                const entries = inputValue.split(',')
-                                                  .map(d => d.trim())
-                                                  .filter(d => d.length > 0);
-                                                
-                                                // Extract domains from URLs or use as-is if already domain
-                                                const extractDomain = (entry: string): string => {
-                                                  try {
-                                                    // Remove protocol if present
-                                                    let cleanEntry = entry.replace(/^https?:\/\//, '');
-                                                    // Extract just the hostname part (remove path, query, etc.)
-                                                    let domain = cleanEntry.split('/')[0].split('?')[0].split('#')[0];
-                                                    return domain.toLowerCase();
-                                                  } catch {
-                                                    return entry.toLowerCase();
-                                                  }
-                                                };
-                                                
-                                                const domains = entries.map(extractDomain);
-                                                const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-                                                const validDomains = domains.filter(domain => 
-                                                  domainRegex.test(domain) && !settingsForm.news_sources.includes(domain)
-                                                );
-                                                
-                                                if (validDomains.length > 0) {
-                                                  setSettingsForm(prev => ({
-                                                    ...prev,
-                                                    news_sources: [...prev.news_sources, ...validDomains]
-                                                  }));
-                                                  input.value = '';
-                                                  toast({
-                                                    title: "Sources added",
-                                                    description: `Added ${validDomains.length} news source${validDomains.length > 1 ? 's' : ''}`
-                                                  });
-                                                } else {
-                                                  toast({
-                                                    title: "No valid sources",
-                                                    description: "Please check the format of your URLs/domains",
-                                                    variant: "destructive"
-                                                  });
-                                                }
-                                              }
-                                            }}
-                                          >
-                                            Add
-                                          </Button>
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          Add domains (example.com) or full URLs (https://example.com/path). Separate multiple entries with commas.
-                                        </div>
-                                      </div>
+                                      {/* Add Source Input and Button */}
+                                       <div className="space-y-2">
+                                         <div className="flex gap-2">
+                                           <Input
+                                             id="new-source"
+                                             placeholder="Enter domain (e.g., techcrunch.com, reuters.com)"
+                                             value={newSourceInput}
+                                             onChange={(e) => setNewSourceInput(e.target.value)}
+                                             onKeyDown={(e) => {
+                                               if (e.key === 'Enter') {
+                                                 e.preventDefault();
+                                                 addNewsSource();
+                                               }
+                                             }}
+                                             className="flex-1"
+                                           />
+                                           <Button
+                                             type="button"
+                                             variant="outline"
+                                             size="sm"
+                                             onClick={addNewsSource}
+                                             disabled={!newSourceInput.trim()}
+                                             className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90"
+                                           >
+                                             <Plus className="h-4 w-4 mr-1" />
+                                             Add Source
+                                           </Button>
+                                         </div>
+                                         
+                                         {/* Quick Add Buttons */}
+                                         <div className="space-y-2">
+                                           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                             Quick Add Common Sources
+                                           </div>
+                                           <div className="flex flex-wrap gap-2">
+                                             <Button
+                                               type="button"
+                                               variant="outline"
+                                               size="sm"
+                                               onClick={() => addQuickSources(['techcrunch.com', 'reuters.com', 'bloomberg.com'])}
+                                               className="text-xs"
+                                             >
+                                               Tech News
+                                             </Button>
+                                             <Button
+                                               type="button"
+                                               variant="outline"
+                                               size="sm"
+                                               onClick={() => addQuickSources(['wsj.com', 'ft.com', 'cnbc.com'])}
+                                               className="text-xs"
+                                             >
+                                               Business News
+                                             </Button>
+                                             <Button
+                                               type="button"
+                                               variant="outline"
+                                               size="sm"
+                                               onClick={() => addQuickSources(['bbc.com', 'cnn.com', 'npr.org'])}
+                                               className="text-xs"
+                                             >
+                                               General News
+                                             </Button>
+                                           </div>
+                                         </div>
+                                       </div>
 
                                       {/* Quick Add Presets */}
                                       <div className="space-y-2">
