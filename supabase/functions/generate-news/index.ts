@@ -274,6 +274,11 @@ CRITICAL JSON FORMATTING RULES:
                   role: 'user',
                   content: `Find the ${group.news_count || 10} most recent news articles about: ${group.news_prompt}
 
+CRITICAL FILTERING REQUIREMENTS:
+- ONLY articles published within the last 48 hours (last 2 days)
+- ONLY articles with unique titles (no duplicates)
+- Verify publication dates are within 48 hours of current time
+
 REQUIRED OUTPUT FORMAT - Return ONLY this exact JSON structure:
 [
   {
@@ -286,13 +291,13 @@ REQUIRED OUTPUT FORMAT - Return ONLY this exact JSON structure:
 ]
 
 STRICT REQUIREMENTS:
-- title: Maximum 80 characters, no quotes inside
+- title: Maximum 80 characters, no quotes inside, must be unique
 - url: Complete source URL (REQUIRED - must be actual article URL)  
-- published_date: YYYY-MM-DD format only
+- published_date: YYYY-MM-DD format only, MUST be within last 48 hours
 - summary: Exactly 60 words, replace all quotes with apostrophes
 - keyword: Single word for image search (no logos, brands, people names)
 
-CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, or special characters with standard ones. Return ONLY the JSON array.`
+CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, or special characters with standard ones. Return ONLY the JSON array. EXCLUDE any articles older than 48 hours or with duplicate titles.`
                 }
               ],
               temperature: 0.1,
@@ -300,7 +305,7 @@ CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, o
               max_tokens: 3000,
               return_images: false,
               return_related_questions: false,
-              search_recency_filter: 'day',
+              search_recency_filter: 'day', // Perplexity day filter + 48hr validation
               frequency_penalty: 1,
               presence_penalty: 0,
               search_domain_filter: ["reuters.com", "bloomberg.com", "techcrunch.com", "cnn.com", "bbc.com", "wsj.com", "ft.com", "nasdaq.com", "marketwatch.com"]
@@ -452,8 +457,72 @@ CRITICAL: Use only standard ASCII quotes. Replace any smart quotes, em-dashes, o
           continue;
         }
 
-        // Create individual posts for each news article
-        const postsToInsert = await Promise.all(newsArticles.slice(0, group.news_count || 10).map(async (article) => {
+        // Filter articles: 48-hour check + duplicate detection against existing posts
+        const now = new Date();
+        const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+        
+        // Get existing post titles from last 7 days for duplicate detection
+        const { data: existingPosts } = await supabaseClient
+          .from('posts')
+          .select('content')
+          .eq('group_id', group.id)
+          .gte('created_at', new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        
+        const existingTitles = new Set();
+        if (existingPosts) {
+          existingPosts.forEach(post => {
+            const titleMatch = post.content.match(/📰 \*\*(.*?)\*\*/);
+            if (titleMatch) {
+              existingTitles.add(titleMatch[1].toLowerCase().trim());
+            }
+          });
+        }
+
+        // Filter and validate articles
+        const validArticles = newsArticles.filter(article => {
+          // Check if title exists and is not duplicate
+          if (!article.title || existingTitles.has(article.title.toLowerCase().trim())) {
+            console.log(`Skipping duplicate article: ${article.title}`);
+            return false;
+          }
+          
+          // Validate 48-hour requirement
+          if (article.published_date) {
+            const publishedDate = new Date(article.published_date);
+            if (publishedDate < fortyEightHoursAgo) {
+              console.log(`Skipping old article (${article.published_date}): ${article.title}`);
+              return false;
+            }
+          }
+          
+          // Validate required fields
+          return article.title && article.summary && article.url;
+        });
+
+        console.log(`Filtered ${newsArticles.length} articles to ${validArticles.length} valid articles within 48 hours`);
+
+        if (validArticles.length === 0) {
+          console.log(`No valid articles found for group ${group.name} within the last 48 hours`);
+          results.push({
+            group: group.name,
+            status: 'success',
+            message: 'No new articles found within the last 48 hours'
+          });
+          
+          // Update status but don't log as failure since this is expected behavior
+          await supabaseClient
+            .from('groups')
+            .update({ 
+              last_news_generation: new Date().toISOString(),
+              news_generation_status: 'completed',
+              last_generation_error: null
+            })
+            .eq('id', group.id);
+          continue;
+        }
+
+        // Create individual posts for each valid news article
+        const postsToInsert = await Promise.all(validArticles.slice(0, group.news_count || 10).map(async (article) => {
           // Get image from Pexels using the keyword from Perplexity
           let thumbnailUrl = null;
           const keyword = article.keyword || 'news';
